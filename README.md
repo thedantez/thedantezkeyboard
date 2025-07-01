@@ -26,6 +26,10 @@ ru:
   alt + t = alt + е = написать "ё"
 
   ctrl + t = табуляция
+
+  ctrl + - = сдвиг курсора назад
+
+  ctrl + = = сдвиг курсора вперёд
  
  клавиатуру можно доделать по своему желанию
  
@@ -54,6 +58,10 @@ en:
   alt + t = write "ё" (for ru lang)
 
   ctrl + t = tabulation
+
+  ctrl + - = move cursor back
+
+  ctrl + - = move cursor forward
 
   u can resume dev at will
   
