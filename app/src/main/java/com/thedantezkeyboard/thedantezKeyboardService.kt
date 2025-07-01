@@ -15,6 +15,7 @@ import android.view.MotionEvent
 import android.os.Handler
 import android.os.Looper
 import androidx.core.content.ContextCompat
+import kotlin.toString
 
 class PCKeyboardService : InputMethodService() {
     private val handler = Handler(Looper.getMainLooper())
@@ -57,6 +58,14 @@ class PCKeyboardService : InputMethodService() {
         keyboardView = null
         handler.removeCallbacksAndMessages(null)
         super.onDestroy()
+    }
+
+    override fun onWindowHidden() {
+        super.onWindowHidden()
+        isBackspaceLongPress = false
+        isDelLongPress = false
+        handler.removeCallbacks(backspaceRunnable)
+        handler.removeCallbacks(delRunnable)
     }
 
     // Состояния модификаторов
@@ -155,8 +164,9 @@ class PCKeyboardService : InputMethodService() {
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
-        super.onFinishInputView(finishingInput)
+        handler.removeCallbacksAndMessages(null)
         resetModifiers()
+        super.onFinishInputView(finishingInput)
     }
 
     private fun createKeyboardView(): View {
@@ -164,6 +174,10 @@ class PCKeyboardService : InputMethodService() {
             orientation = LinearLayout.VERTICAL
             layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
             setBackgroundColor(Color.BLACK)
+
+            //new:
+            overScrollMode = View.OVER_SCROLL_NEVER
+            isVerticalScrollBarEnabled = false
         }
 
         // Ряд 1: 1 2 3 4 5 6 7 8 9 0 - = Backspace
@@ -200,21 +214,21 @@ class PCKeyboardService : InputMethodService() {
             orientation = LinearLayout.HORIZONTAL
             layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
         }
-        addModifierButton(row4, "SHIFT", 1.5f, ::handleShift, isShiftPressed || isCapsLock)
+        addModifierButton(row4, "SH", 1.5f, ::handleShift, isShiftPressed || isCapsLock)
         listOf("z", "x", "c", "v", "b", "n", "m", ",", ".", "/").forEach { key ->
             addKeyToRow(row4, key, 1f)
         }
-        addKeyToRow(row4, "LANG", 1.5f, ::toggleLanguage)
+        addKeyToRow(row4, "EN", 1.5f, ::toggleLanguage)
 
         // Ряд 5: Ctrl Space Alt Enter
         val row5 = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
         }
-        addModifierButton(row5, "CTRL", 1.5f, { toggleModifier("CTRL") }, isCtrlPressed)
-        addKeyToRow(row5, "Space", 4f, { sendText(" ") })
-        addModifierButton(row5, "ALT", 1.5f, { toggleModifier("ALT") }, isAltPressed)
-        addKeyToRow(row5, "↵", 1.5f, ::handleEnter, true)
+        addModifierButton(row5, "CTRL", 1.25f, { toggleModifier("CTRL") }, isCtrlPressed)
+        addKeyToRow(row5, "Space", 4.5f, { sendText(" ") })
+        addModifierButton(row5, "ALT", 1.25f, { toggleModifier("ALT") }, isAltPressed)
+        addKeyToRow(row5, "ENTR", 1.5f, ::handleEnter, true)
 
         // Добавляем все ряды в основной layout
         listOf(row1, row2, row3, row4, row5).forEach { keyboardLayout.addView(it) }
@@ -245,6 +259,7 @@ class PCKeyboardService : InputMethodService() {
 
                 else -> ContextCompat.getDrawable(context, R.drawable.rounded_button_black)
             }
+            textSize = 17f
             setTextColor(Color.WHITE)
 
 
@@ -313,7 +328,7 @@ class PCKeyboardService : InputMethodService() {
                 if (isActive) R.drawable.rounded_button_gray
                 else R.drawable.rounded_button_black
             )
-
+            textSize = 16f
             setTextColor(Color.WHITE)
             setOnClickListener { onClick() }
         }
@@ -336,17 +351,17 @@ class PCKeyboardService : InputMethodService() {
     private fun updateKeyboardState() {
         handler.post {
             keyboardView?.let { root ->
-                val keysToUpdate = enLayout.keys + ruLayout.keys + setOf("LANG")
+                val keysToUpdate = enLayout.keys + ruLayout.keys + setOf("EN")
                 keysToUpdate.forEach { key ->
                     // Явное приведение типа к Button
                     val button = root.findViewWithTag(key) as? Button
                     button?.text = when (key) {
-                        "LANG" -> if (isEnglishLayout) "EN" else "RU"
+                        "EN" -> if (isEnglishLayout) "EN" else "RU"
                         else -> getKeyDisplayText(key)
                     }
                 }
 
-                updateModifierButton(root, "SHIFT", isShiftPressed || isCapsLock)
+                updateModifierButton(root, "SH", isShiftPressed || isCapsLock)
                 updateModifierButton(root, "CTRL", isCtrlPressed)
                 updateModifierButton(root, "ALT", isAltPressed)
             }
@@ -371,13 +386,16 @@ class PCKeyboardService : InputMethodService() {
                 isShiftPressed = false
             }
 
-            isShiftPressed -> isCapsLock = true
+            isShiftPressed -> {
+                isCapsLock = true
+            }
             else -> isShiftPressed = true
         }
-        updateKeyboardState() // Используйте актуальную функцию
+        updateKeyboardState()
     }
 
     private fun handleKeyPress(key: String) {
+        var movingCursor = false
         when {
             isCtrlPressed && key == "c" -> copyText()
             isCtrlPressed && key == "v" -> pasteText()
@@ -386,6 +404,14 @@ class PCKeyboardService : InputMethodService() {
             isCtrlPressed && key == "a" -> selectAllText()
             isAltPressed && key == "t" -> rulangSendTextYo()
             isCtrlPressed && key == "t" -> sendText("\t")
+            isCtrlPressed && key == "-" -> {
+                moveCursorText(false)
+                movingCursor = true
+            }
+            isCtrlPressed && key == "=" -> {
+                moveCursorText(true)
+                movingCursor = true
+            }
             else -> {
                 val charToSend = getKeyDisplayText(key)
                 sendText(charToSend)
@@ -393,14 +419,34 @@ class PCKeyboardService : InputMethodService() {
         }
 
         //сброс ctrl и alt после комбинации
-        if (isCtrlPressed || isAltPressed) {
+        if ((isCtrlPressed || isAltPressed) && !movingCursor) {
             resetModifiers()
+            movingCursor = false
         }
 
         // Снимаем Shift после одного символа, если не включен CapsLock
         if (isShiftPressed && !isCapsLock) {
             isShiftPressed = false
             updateKeyboardState()
+        }
+    }
+
+    private fun moveCursorText(moveForward: Boolean) {
+        safeInputConnection { ic ->
+            val textBefore = ic.getTextBeforeCursor(10000, 0)?.toString() ?: ""
+            val currentPosition = textBefore.length
+            val newPosition: Int
+
+            if (moveForward) {
+                val textAfter = ic.getTextAfterCursor(10000, 0)?.toString() ?: ""
+                if (textAfter.isEmpty()) return@safeInputConnection
+                newPosition = maxOf(0, currentPosition + 1)
+            } else {
+                if (currentPosition == 0) return@safeInputConnection
+                newPosition = maxOf(0, currentPosition - 1)
+            }
+
+            ic.setSelection(newPosition, newPosition)
         }
     }
 
