@@ -5,8 +5,10 @@
 ru:
  это клавиатура является гибридом экранной клавиатуры дял телефона и физической 65% клавиатуры для компьютера. Написана преимущественно с помощью deepseek-r1, хотя задумка собственная
  
- ![image](https://github.com/user-attachments/assets/86db5ef6-f846-49dc-9a51-55bcf4564bfb)
- ![image](https://github.com/user-attachments/assets/c880d37a-646a-443d-b86e-1f1944454b65)
+  ![photo_3_2025-06-27_00-14-28](https://github.com/user-attachments/assets/db3b4546-aa6a-4bd9-8a07-d7cf4a40ddb2)
+  ![photo_2_2025-06-27_00-14-28](https://github.com/user-attachments/assets/5a14de9f-913b-4f7e-985b-02794f30b492) 
+  ![photo_1_2025-06-27_00-14-28](https://github.com/user-attachments/assets/915bc6ec-34ba-4199-a235-892789e21cd8)
+
 
 комбинации:
   ctrl + c = скопировать текст
@@ -22,11 +24,13 @@ ru:
   ctrl + del = удалить слово спереди курсора
   
   alt + t = alt + е = написать "ё"
+
+  ctrl + t = табуляция
  
  клавиатуру можно доделать по своему желанию
  
 **путь к .apk файлу:**
-  https://github.com/dantez004/thedantezkeyboard/blob/main/apk/thedantezkeyboard.apk
+  [https://github.com/dantez004/thedantezkeyboard/blob/main/apk/thedantezkeyboard.apk](https://github.com/dantez004/thedantezkeyboard/tree/main/apk)
 
 
 en:
@@ -49,10 +53,12 @@ en:
   
   alt + t = write "ё" (for ru lang)
 
+  ctrl + t = tabulation
+
   u can resume dev at will
   
 **path to .apk file:**
-  https://github.com/dantez004/thedantezkeyboard/blob/main/apk/thedantezkeyboard.apk
+  [https://github.com/dantez004/thedantezkeyboard/blob/main/apk/thedantezkeyboard.apk](https://github.com/dantez004/thedantezkeyboard/tree/main/apk)
   
 
 
