@@ -30,7 +30,7 @@ class PCKeyboardService : InputMethodService() {
                 } else {
                     handleBackspace()
                 }
-                handler.postDelayed(this, 30)
+                handler.postDelayed(this, 100)
             }
         }
     }
@@ -45,7 +45,7 @@ class PCKeyboardService : InputMethodService() {
                 } else {
                     handleDelete()
                 }
-                handler.postDelayed(this, 30)
+                handler.postDelayed(this, 100)
             }
         }
     }
