@@ -15,9 +15,18 @@ import android.view.MotionEvent
 import android.os.Handler
 import android.os.Looper
 import androidx.core.content.ContextCompat
-import kotlin.toString
+import kotlin.math.abs
 
 class PCKeyboardService : InputMethodService() {
+
+    // Переменные для управления жестом на пробеле
+    private var spaceInitialX: Float = 0f
+    private var spaceInitialY: Float = 0f
+    private var isSpaceGestureActive: Boolean = false
+    private val gestureThreshold = 15f // Порог чувствительности жеста (в пикселях)
+    private var lastMoveTime: Long = 0
+    private val moveDelay = 50L // Задержка между перемещениями (мс)
+
     private val handler = Handler(Looper.getMainLooper())
 
     private var isBackspaceLongPress = false
@@ -128,14 +137,6 @@ class PCKeyboardService : InputMethodService() {
         "." to "Ю", "/" to ","
     )
 
-    private fun getCurrentLayout(): Map<String, String> {
-        return when {
-            isEnglishLayout && (isShiftPressed || isCapsLock) -> enShiftLayout
-            isEnglishLayout -> enLayout
-            isShiftPressed || isCapsLock -> ruShiftLayout
-            else -> ruLayout
-        }
-    }
 
     private fun getKeyDisplayText(key: String): String {
         val layout = when {
@@ -226,7 +227,7 @@ class PCKeyboardService : InputMethodService() {
             layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
         }
         addModifierButton(row5, "CTRL", 1.25f, { toggleModifier("CTRL") }, isCtrlPressed)
-        addKeyToRow(row5, "Space", 4.5f, { sendText(" ") })
+        addSpaceKeyToRow(row5, 4.5f)
         addModifierButton(row5, "ALT", 1.25f, { toggleModifier("ALT") }, isAltPressed)
         addKeyToRow(row5, "ENTR", 1.5f, ::handleEnter, true)
 
@@ -238,6 +239,175 @@ class PCKeyboardService : InputMethodService() {
 
     // Вспомогательная функция для добавления обычной кнопки
     @SuppressLint("ClickableViewAccessibility")
+    private fun addSpaceKeyToRow(row: LinearLayout, weight: Float) {
+        val button = Button(this).apply {
+            tag = "Space"
+            text = "Space"
+            layoutParams = LayoutParams(0, 150, weight).apply {
+                setMargins(2, 2, 2, 2)
+            }
+            background = ContextCompat.getDrawable(context, R.drawable.rounded_button_black)
+            textSize = 17f
+            setTextColor(Color.WHITE)
+
+            setOnTouchListener { v, event ->
+                when (event.action) {
+                    MotionEvent.ACTION_DOWN -> {
+                        val keepCtrl = isCtrlPressed
+                        resetModifiers()
+                        isCtrlPressed = keepCtrl
+
+                        // Запоминаем начальную позицию касания
+                        spaceInitialX = event.rawX
+                        spaceInitialY = event.rawY
+                        isSpaceGestureActive = false
+                        true
+                    }
+
+                    MotionEvent.ACTION_MOVE -> {
+                        if (!isSpaceGestureActive) {
+                            // Проверяем превышение порога для активации жеста
+                            val dx = abs(event.rawX - spaceInitialX)
+                            val dy = abs(event.rawY - spaceInitialY)
+
+                            if (dx > gestureThreshold || dy > gestureThreshold) {
+                                isSpaceGestureActive = true
+                            }
+                        }
+
+                        if (isSpaceGestureActive) {
+                            // Обработка перемещения курсора
+                            val currentTime = System.currentTimeMillis()
+                            if (currentTime - lastMoveTime > moveDelay) {
+                                handleSpaceGesture(event.rawX, event.rawY)
+                                lastMoveTime = currentTime
+
+                                spaceInitialX = event.rawX
+                                spaceInitialY = event.rawY
+                            }
+                            true
+                        } else {
+                            false
+                        }
+                    }
+
+                    MotionEvent.ACTION_UP -> {
+                        if (!isSpaceGestureActive) {
+                            // Если жест не активирован - вводим пробел
+                            sendText(" ")
+                        }
+                        isSpaceGestureActive = false
+                        true
+                    }
+
+                    else -> false
+                }
+            }
+        }
+        row.addView(button)
+    }
+
+    private fun handleSpaceGesture(currentX: Float, currentY: Float) {
+        if (!isSpaceGestureActive) return
+
+        val dx = currentX - spaceInitialX
+        val dy = currentY - spaceInitialY
+        val isHorizontal = abs(dx) > abs(dy)
+
+        when {
+            isHorizontal && dx > 0 -> {
+                if (isCtrlPressed) moveCursorToNextWord() else moveCursorRight()
+            }
+
+            isHorizontal && dx < 0 -> {
+                if (isCtrlPressed) moveCursorToPrevWord() else moveCursorLeft()
+            }
+
+            !isHorizontal && dy > 0 -> moveCursorDown()
+            !isHorizontal && dy < 0 -> moveCursorUp()
+        }
+    }
+
+    private fun moveCursorToPrevWord() {
+        safeInputConnection { ic ->
+            // Эмуляция Ctrl+СтрелкаВлево
+            val now = System.currentTimeMillis()
+            ic.sendKeyEvent(
+                KeyEvent(
+                    now, now,
+                    KeyEvent.ACTION_DOWN,
+                    KeyEvent.KEYCODE_DPAD_LEFT,
+                    0,
+                    KeyEvent.META_CTRL_ON
+                )
+            )
+            ic.sendKeyEvent(
+                KeyEvent(
+                    now, now,
+                    KeyEvent.ACTION_UP,
+                    KeyEvent.KEYCODE_DPAD_LEFT,
+                    0,
+                    KeyEvent.META_CTRL_ON
+                )
+            )
+        }
+    }
+
+    private fun moveCursorToNextWord() {
+        safeInputConnection { ic ->
+            // Эмуляция Ctrl+СтрелкаВправо
+            val now = System.currentTimeMillis()
+            ic.sendKeyEvent(
+                KeyEvent(
+                    now, now,
+                    KeyEvent.ACTION_DOWN,
+                    KeyEvent.KEYCODE_DPAD_RIGHT,
+                    0,
+                    KeyEvent.META_CTRL_ON
+                )
+            )
+            ic.sendKeyEvent(
+                KeyEvent(
+                    now, now,
+                    KeyEvent.ACTION_UP,
+                    KeyEvent.KEYCODE_DPAD_RIGHT,
+                    0,
+                    KeyEvent.META_CTRL_ON
+                )
+            )
+        }
+    }
+
+    private fun moveCursorLeft() {
+        safeInputConnection { ic ->
+            ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_LEFT))
+            ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_LEFT))
+        }
+    }
+
+    private fun moveCursorRight() {
+        safeInputConnection { ic ->
+            ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_RIGHT))
+            ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_RIGHT))
+        }
+    }
+
+    private fun moveCursorUp() {
+        // Реализация перемещения вверх (аналогично клавише UP)
+        safeInputConnection { ic ->
+            ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_UP))
+            ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_UP))
+        }
+    }
+
+    private fun moveCursorDown() {
+        // Реализация перемещения вниз (аналогично клавише DOWN)
+        safeInputConnection { ic ->
+            ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_DOWN))
+            ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_DOWN))
+        }
+    }
+
     private fun addKeyToRow(
         row: LinearLayout,
         key: String,
@@ -389,6 +559,7 @@ class PCKeyboardService : InputMethodService() {
             isShiftPressed -> {
                 isCapsLock = true
             }
+
             else -> isShiftPressed = true
         }
         updateKeyboardState()
@@ -408,10 +579,12 @@ class PCKeyboardService : InputMethodService() {
                 moveCursorText(false)
                 movingCursor = true
             }
+
             isCtrlPressed && key == "=" -> {
                 moveCursorText(true)
                 movingCursor = true
             }
+
             else -> {
                 val charToSend = getKeyDisplayText(key)
                 sendText(charToSend)
