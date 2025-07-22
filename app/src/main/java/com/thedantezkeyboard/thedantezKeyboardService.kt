@@ -330,65 +330,77 @@ class PCKeyboardService : InputMethodService() {
 
     private fun moveCursorToPrevWord() {
         safeInputConnection { ic ->
-            // Эмуляция Ctrl+СтрелкаВлево
-            val now = System.currentTimeMillis()
-            ic.sendKeyEvent(
-                KeyEvent(
-                    now, now,
-                    KeyEvent.ACTION_DOWN,
-                    KeyEvent.KEYCODE_DPAD_LEFT,
-                    0,
-                    KeyEvent.META_CTRL_ON
+            val textBefore = ic.getTextBeforeCursor(1, 0)?.toString()
+            if (!textBefore.isNullOrEmpty()) {
+                // Эмуляция Ctrl+СтрелкаВлево
+                val now = System.currentTimeMillis()
+                ic.sendKeyEvent(
+                    KeyEvent(
+                        now, now,
+                        KeyEvent.ACTION_DOWN,
+                        KeyEvent.KEYCODE_DPAD_LEFT,
+                        0,
+                        KeyEvent.META_CTRL_ON
+                    )
                 )
-            )
-            ic.sendKeyEvent(
-                KeyEvent(
-                    now, now,
-                    KeyEvent.ACTION_UP,
-                    KeyEvent.KEYCODE_DPAD_LEFT,
-                    0,
-                    KeyEvent.META_CTRL_ON
+                ic.sendKeyEvent(
+                    KeyEvent(
+                        now, now,
+                        KeyEvent.ACTION_UP,
+                        KeyEvent.KEYCODE_DPAD_LEFT,
+                        0,
+                        KeyEvent.META_CTRL_ON
+                    )
                 )
-            )
+            }
         }
     }
 
     private fun moveCursorToNextWord() {
         safeInputConnection { ic ->
             // Эмуляция Ctrl+СтрелкаВправо
-            val now = System.currentTimeMillis()
-            ic.sendKeyEvent(
-                KeyEvent(
-                    now, now,
-                    KeyEvent.ACTION_DOWN,
-                    KeyEvent.KEYCODE_DPAD_RIGHT,
-                    0,
-                    KeyEvent.META_CTRL_ON
+            val textAfter = ic.getTextAfterCursor(1, 0)?.toString()
+            if (!textAfter.isNullOrEmpty()) {
+                val now = System.currentTimeMillis()
+                ic.sendKeyEvent(
+                    KeyEvent(
+                        now, now,
+                        KeyEvent.ACTION_DOWN,
+                        KeyEvent.KEYCODE_DPAD_RIGHT,
+                        0,
+                        KeyEvent.META_CTRL_ON
+                    )
                 )
-            )
-            ic.sendKeyEvent(
-                KeyEvent(
-                    now, now,
-                    KeyEvent.ACTION_UP,
-                    KeyEvent.KEYCODE_DPAD_RIGHT,
-                    0,
-                    KeyEvent.META_CTRL_ON
+                ic.sendKeyEvent(
+                    KeyEvent(
+                        now, now,
+                        KeyEvent.ACTION_UP,
+                        KeyEvent.KEYCODE_DPAD_RIGHT,
+                        0,
+                        KeyEvent.META_CTRL_ON
+                    )
                 )
-            )
+            }
         }
     }
 
     private fun moveCursorLeft() {
         safeInputConnection { ic ->
-            ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_LEFT))
-            ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_LEFT))
+            val textBefore = ic.getTextBeforeCursor(1, 0)?.toString()
+            if (!textBefore.isNullOrEmpty()) {
+                ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_LEFT))
+                ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_LEFT))
+            }
         }
     }
 
     private fun moveCursorRight() {
         safeInputConnection { ic ->
-            ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_RIGHT))
-            ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_RIGHT))
+            val textAfter = ic.getTextAfterCursor(1, 0)?.toString()
+            if (!textAfter.isNullOrEmpty()) {
+                ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_RIGHT))
+                ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_RIGHT))
+            }
         }
     }
 
