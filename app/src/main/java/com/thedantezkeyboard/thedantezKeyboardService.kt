@@ -323,8 +323,8 @@ class PCKeyboardService : InputMethodService() {
                 if (isCtrlPressed) moveCursorToPrevWord() else moveCursorLeft()
             }
 
-            !isHorizontal && dy > 0 -> moveCursorDown()
-            !isHorizontal && dy < 0 -> moveCursorUp()
+            !isHorizontal && dy > 10f -> moveCursorDown()
+            !isHorizontal && dy < -10f -> moveCursorUp()
         }
     }
 
@@ -407,16 +407,22 @@ class PCKeyboardService : InputMethodService() {
     private fun moveCursorUp() {
         // Реализация перемещения вверх (аналогично клавише UP)
         safeInputConnection { ic ->
-            ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_UP))
-            ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_UP))
+            val textBefore = ic.getTextBeforeCursor(1, 0)?.toString()
+            if (!textBefore.isNullOrEmpty()) {
+                ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_UP))
+                ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_UP))
+            }
         }
     }
 
     private fun moveCursorDown() {
         // Реализация перемещения вниз (аналогично клавише DOWN)
         safeInputConnection { ic ->
-            ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_DOWN))
-            ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_DOWN))
+            val textAfter = ic.getTextAfterCursor(1, 0)?.toString()
+            if (!textAfter.isNullOrEmpty()) {
+                ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_DOWN))
+                ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_DOWN))
+            }
         }
     }
 
