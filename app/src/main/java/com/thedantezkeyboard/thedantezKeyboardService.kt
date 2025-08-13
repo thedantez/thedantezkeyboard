@@ -1,6 +1,7 @@
 package com.thedantezkeyboard
 
 import android.annotation.SuppressLint
+import android.app.ActionBar
 import android.graphics.Color
 import android.inputmethodservice.InputMethodService
 import android.util.Log
@@ -19,13 +20,19 @@ import kotlin.math.abs
 
 class PCKeyboardService : InputMethodService() {
 
+
+    // Состояния модификаторов
+    private var isCtrlPressed = false
+    private var isAltPressed = false
+    private var isShiftPressed = false
+    private var isCapsLock = false
+    private var isEnglishLayout = true
+
     // Переменные для управления жестом на пробеле
     private var spaceInitialX: Float = 0f
     private var spaceInitialY: Float = 0f
     private var isSpaceGestureActive: Boolean = false
-    private val gestureThreshold = 15f // Порог чувствительности жеста (в пикселях)
     private var lastMoveTime: Long = 0
-    private val moveDelay = 50L // Задержка между перемещениями (мс)
 
     private val handler = Handler(Looper.getMainLooper())
 
@@ -77,12 +84,6 @@ class PCKeyboardService : InputMethodService() {
         handler.removeCallbacks(delRunnable)
     }
 
-    // Состояния модификаторов
-    private var isCtrlPressed = false
-    private var isAltPressed = false
-    private var isShiftPressed = false
-    private var isCapsLock = false
-    private var isEnglishLayout = true
 
     // Раскладки
     private val enLayout = mapOf(
@@ -137,6 +138,9 @@ class PCKeyboardService : InputMethodService() {
         "." to "Ю", "/" to ","
     )
 
+    private fun isEmptyRowEnabled(): Boolean {
+        return Preferences.isEmptyRowEnabled(this)
+    }
 
     private fun getKeyDisplayText(key: String): String {
         val layout = when {
@@ -231,10 +235,28 @@ class PCKeyboardService : InputMethodService() {
         addModifierButton(row5, "ALT", 1.25f, { toggleModifier("ALT") }, isAltPressed)
         addKeyToRow(row5, "ENTR", 1.5f, ::handleEnter, true)
 
-        // Добавляем все ряды в основной layout
-        listOf(row1, row2, row3, row4, row5).forEach { keyboardLayout.addView(it) }
+        val emptyrow6 = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams =
+                LayoutParams(LayoutParams.MATCH_PARENT, ActionBar.LayoutParams.WRAP_CONTENT)
+        }
+
+        if (isEmptyRowEnabled()) {
+            addEmpty(emptyrow6, 8.5f)
+            // Добавляем все ряды в основной layout
+            listOf(row1, row2, row3, row4, row5, emptyrow6).forEach { keyboardLayout.addView(it) }
+        } else {
+            listOf(row1, row2, row3, row4, row5).forEach { keyboardLayout.addView(it) }
+        }
 
         return keyboardLayout
+    }
+
+    private fun addEmpty(row: LinearLayout, weight: Float) {
+        val empty = android.widget.Space(this).apply {
+            layoutParams = LayoutParams(0, 150, weight)
+        }
+        row.addView(empty)
     }
 
     // Вспомогательная функция для добавления обычной кнопки
@@ -269,6 +291,7 @@ class PCKeyboardService : InputMethodService() {
                             // Проверяем превышение порога для активации жеста
                             val dx = abs(event.rawX - spaceInitialX)
                             val dy = abs(event.rawY - spaceInitialY)
+                            val gestureThreshold = 100f // Порог чувствительности жеста (в пикселях)
 
                             if (dx > gestureThreshold || dy > gestureThreshold) {
                                 isSpaceGestureActive = true
@@ -278,6 +301,8 @@ class PCKeyboardService : InputMethodService() {
                         if (isSpaceGestureActive) {
                             // Обработка перемещения курсора
                             val currentTime = System.currentTimeMillis()
+                            val moveDelay =
+                                if (isCtrlPressed) 100L else 0L //задержка между перемещениями (мс)
                             if (currentTime - lastMoveTime > moveDelay) {
                                 handleSpaceGesture(event.rawX, event.rawY)
                                 lastMoveTime = currentTime
