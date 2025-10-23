@@ -15,10 +15,11 @@ import android.widget.LinearLayout.LayoutParams
 import android.view.MotionEvent
 import android.os.Handler
 import android.os.Looper
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.core.content.ContextCompat
 import kotlin.math.abs
 
-class PCKeyboardService : InputMethodService() {
+class ThedantezKeyboardService : InputMethodService() {
 
 
     // Состояния модификаторов
@@ -38,6 +39,7 @@ class PCKeyboardService : InputMethodService() {
 
     private var isBackspaceLongPress = false
     private var backspaceLongPressWithCtrl = false
+    private var speedDelete: Long = 100L
     private val backspaceRunnable = object : Runnable {
         override fun run() {
             if (isBackspaceLongPress) {
@@ -46,7 +48,8 @@ class PCKeyboardService : InputMethodService() {
                 } else {
                     handleBackspace()
                 }
-                handler.postDelayed(this, 100)
+                speedDelete = getSpeedDelete().toLong()
+                handler.postDelayed(this, speedDelete)
             }
         }
     }
@@ -61,12 +64,20 @@ class PCKeyboardService : InputMethodService() {
                 } else {
                     handleDelete()
                 }
-                handler.postDelayed(this, 100)
+                speedDelete = getSpeedDelete().toLong()
+                handler.postDelayed(this, speedDelete)
             }
         }
     }
 
     private val TAG = "KeyboardService"
+
+    private var currentKeyboardType: KeyboardType = KeyboardType.MAIN
+    private var isNumpadForced = false
+
+    private enum class KeyboardType {
+        MAIN, NUMPAD
+    }
 
     private var keyboardView: View? = null
 
@@ -84,6 +95,7 @@ class PCKeyboardService : InputMethodService() {
         handler.removeCallbacks(delRunnable)
     }
 
+    private var bigSymbsEnabled = false
 
     // Раскладки
     private val enLayout = mapOf(
@@ -142,14 +154,57 @@ class PCKeyboardService : InputMethodService() {
         return Preferences.isEmptyRowEnabled(this)
     }
 
-    private fun getKeyDisplayText(key: String): String {
+    private fun isBigSymbsEnabled(): Boolean {
+        return Preferences.isBigSymbsEnabled(this)
+    }
+
+    private fun getFontSize(): Float {
+        return Preferences.getFontSize(this)
+    }
+
+    private fun getSpeedDelete(): Int {
+        return Preferences.getSpeedDelete(this)
+    }
+
+    private fun getKeyInputText(key: String): String {
+        if (currentKeyboardType == KeyboardType.NUMPAD) {
+            return key
+        }
+
         val layout = when {
             isEnglishLayout && (isShiftPressed || isCapsLock) -> enShiftLayout
             isEnglishLayout -> enLayout
             isShiftPressed || isCapsLock -> ruShiftLayout
             else -> ruLayout
         }
+
         return layout[key] ?: key
+    }
+
+    private fun getKeyDisplayText(key: String): String {
+        if (currentKeyboardType == KeyboardType.NUMPAD) {
+            return when (key) {
+                "MAIN" -> "ABC"
+                else -> key
+            }
+        }
+
+        val layout = when {
+            isEnglishLayout && (isShiftPressed || isCapsLock) -> enShiftLayout
+            isEnglishLayout -> enLayout
+            isShiftPressed || isCapsLock -> ruShiftLayout
+            else -> ruLayout
+        }
+
+        var result = layout[key] ?: key
+
+        if (bigSymbsEnabled && result.length == 1) {
+            val char = result[0]
+            if (char.isLetter()) {
+                result = char.uppercaseChar().toString()
+            }
+        }
+        return result
     }
 
     private fun resetModifiers() {
@@ -163,8 +218,17 @@ class PCKeyboardService : InputMethodService() {
     }
 
     override fun onCreateInputView(): View {
-        return createKeyboardView().also {
-            keyboardView = it
+//        return createKeyboardView().also {
+//            keyboardView = it
+//        }
+        return when (currentKeyboardType) {
+            ThedantezKeyboardService.KeyboardType.MAIN -> createKeyboardView().also {
+                keyboardView = it
+            }
+
+            ThedantezKeyboardService.KeyboardType.NUMPAD -> createNumpadKeyboardView().also {
+                keyboardView = it
+            }
         }
     }
 
@@ -172,6 +236,98 @@ class PCKeyboardService : InputMethodService() {
         handler.removeCallbacksAndMessages(null)
         resetModifiers()
         super.onFinishInputView(finishingInput)
+    }
+
+    private fun createNumpadKeyboardView(): View {
+        val keyboardLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
+            setBackgroundColor(Color.BLACK)
+            overScrollMode = View.OVER_SCROLL_NEVER
+            isVerticalScrollBarEnabled = false
+        }
+        // Ряд 1: 7 8 9 +
+        val row1 = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
+        }
+        listOf("7", "8", "9", "+").forEach { key ->
+            addKeyToRow(row1, key, 1f)
+        }
+        addKeyToRow(row1, "BS", 1.5f, ::handleBackspace, true)
+
+        // Ряд 2: 4 5 6
+        val row2 = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
+        }
+        listOf("4", "5", "6", "-").forEach { key ->
+            addKeyToRow(row2, key, 1f)
+        }
+        addKeyToRow(row2, "DEL", 1.5f, ::handleDelete, true)
+
+        // Ряд 3: 1 2 3
+        val row3 = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
+        }
+        listOf("1", "2", "3", "*").forEach { key ->
+            addKeyToRow(row3, key, 1f)
+        }
+        addKeyToRow(row3, "ENTR", 1.5f, ::handleEnter, true)
+
+        // Ряд 4: 0 . /
+        val row4 = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
+        }
+        addKeyToRow(row4, "0", 2f)
+        addKeyToRow(row4, ".", 1f)
+        addKeyToRow(row4, "/", 1f)
+        addKeyToRow(row4, "MAIN", 1.5f, ::switchToMainKeyboard, true)
+
+        if (isEmptyRowEnabled()) {
+            val emptyrow5 = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                layoutParams =
+                    LayoutParams(LayoutParams.MATCH_PARENT, ActionBar.LayoutParams.WRAP_CONTENT)
+            }
+            addEmpty(emptyrow5, 8.5f)
+            listOf(row1, row2, row3, row4, emptyrow5).forEach { keyboardLayout.addView(it) }
+        } else {
+            listOf(row1, row2, row3, row4).forEach { keyboardLayout.addView(it) }
+        }
+
+        return keyboardLayout
+    }
+
+    // Функции переключения клавиатур
+    private fun switchToMainKeyboard() {
+        currentKeyboardType = KeyboardType.MAIN
+        isNumpadForced = false
+        updateInputView()
+    }
+
+    private fun switchToNumpadKeyboard() {
+        currentKeyboardType = KeyboardType.NUMPAD
+        isNumpadForced = true
+        updateInputView()
+    }
+
+    private fun toggleKeyboard() {
+        when (currentKeyboardType) {
+            KeyboardType.MAIN -> switchToNumpadKeyboard()
+            KeyboardType.NUMPAD -> switchToMainKeyboard()
+        }
+    }
+
+    private fun updateInputView() {
+        val newView = when (currentKeyboardType) {
+            KeyboardType.MAIN -> createKeyboardView()
+            KeyboardType.NUMPAD -> createNumpadKeyboardView()
+        }
+        setInputView(newView)
+        keyboardView = newView
     }
 
     private fun createKeyboardView(): View {
@@ -269,7 +425,7 @@ class PCKeyboardService : InputMethodService() {
                 setMargins(2, 2, 2, 2)
             }
             background = ContextCompat.getDrawable(context, R.drawable.rounded_button_black)
-            textSize = 17f
+            textSize = getFontSize()
             setTextColor(Color.WHITE)
 
             setOnTouchListener { v, event ->
@@ -472,7 +628,7 @@ class PCKeyboardService : InputMethodService() {
 
                 else -> ContextCompat.getDrawable(context, R.drawable.rounded_button_black)
             }
-            textSize = 17f
+            textSize = getFontSize()
             setTextColor(Color.WHITE)
 
 
@@ -491,6 +647,7 @@ class PCKeyboardService : InputMethodService() {
                     onClick == ::handleBackspace -> {
                         isBackspaceLongPress = true
                         backspaceLongPressWithCtrl = isCtrlPressed
+                        speedDelete = getSpeedDelete().toLong()
                         handler.post(backspaceRunnable)
                         true
                     }
@@ -498,6 +655,7 @@ class PCKeyboardService : InputMethodService() {
                     onClick == ::handleDelete -> {
                         isDelLongPress = true
                         delLongPressWithCtrl = isCtrlPressed
+                        speedDelete = getSpeedDelete().toLong()
                         handler.post(delRunnable)
                         true
                     }
@@ -541,7 +699,7 @@ class PCKeyboardService : InputMethodService() {
                 if (isActive) R.drawable.rounded_button_gray
                 else R.drawable.rounded_button_black
             )
-            textSize = 16f
+            textSize = getFontSize() - 1
             setTextColor(Color.WHITE)
             setOnClickListener { onClick() }
         }
@@ -562,276 +720,326 @@ class PCKeyboardService : InputMethodService() {
     }
 
     private fun updateKeyboardState() {
+        bigSymbsEnabled = isBigSymbsEnabled()
+        speedDelete = getSpeedDelete().toLong()
+
         handler.post {
             keyboardView?.let { root ->
-                val keysToUpdate = enLayout.keys + ruLayout.keys + setOf("EN")
-                keysToUpdate.forEach { key ->
-                    // Явное приведение типа к Button
-                    val button = root.findViewWithTag(key) as? Button
-                    button?.text = when (key) {
-                        "EN" -> if (isEnglishLayout) "EN" else "RU"
-                        else -> getKeyDisplayText(key)
+                when (currentKeyboardType) {
+                    KeyboardType.MAIN -> {
+                        val keysToUpdate = enLayout.keys + ruLayout.keys + setOf("EN")
+                        keysToUpdate.forEach { key ->
+                            val button = root.findViewWithTag(key) as? Button
+                            button?.text = when (key) {
+                                "EN" -> if (isEnglishLayout) "EN" else "RU"
+                                else -> getKeyDisplayText(key)
+                            }
+                        }
+
+                        updateModifierButton(root, "SH", isShiftPressed || isCapsLock)
+                        updateModifierButton(root, "CTRL", isCtrlPressed)
+                        updateModifierButton(root, "ALT", isAltPressed)
+                    }
+                    KeyboardType.NUMPAD -> {
+                        val mainButton = root.findViewWithTag("MAIN") as? Button
+                        mainButton?.text = "ABC"
                     }
                 }
-
-                updateModifierButton(root, "SH", isShiftPressed || isCapsLock)
-                updateModifierButton(root, "CTRL", isCtrlPressed)
-                updateModifierButton(root, "ALT", isAltPressed)
             }
         }
     }
 
-    private fun updateModifierButton(root: View, text: String, isActive: Boolean) {
-        val button = root.findViewWithTag(text) as? Button
-        button?.apply {
-            background = ContextCompat.getDrawable(
-                context,
-                if (isActive) R.drawable.rounded_button_gray
-                else R.drawable.rounded_button_black
-            )
+private fun updateModifierButton(root: View, text: String, isActive: Boolean) {
+    val button = root.findViewWithTag(text) as? Button
+    button?.apply {
+        background = ContextCompat.getDrawable(
+            context,
+            if (isActive) R.drawable.rounded_button_gray
+            else R.drawable.rounded_button_black
+        )
+    }
+}
+
+private fun handleShift() {
+    when {
+        isCapsLock && isShiftPressed -> {
+            isCapsLock = false
+            isShiftPressed = false
+        }
+
+        isShiftPressed -> {
+            isCapsLock = true
+        }
+
+        else -> isShiftPressed = true
+    }
+    updateKeyboardState()
+}
+
+private fun handleKeyPress(key: String) {
+    var movingCursor = false
+    when {
+        isCtrlPressed && key == "c" -> copyText()
+        isCtrlPressed && key == "v" -> pasteText()
+        isCtrlPressed && key == "x" -> cutText()
+        //собственные комбинации | myself combinations
+        isCtrlPressed && key == "a" -> selectAllText()
+        isAltPressed && key == "t" -> rulangSendTextYo()
+        isCtrlPressed && key == "t" -> sendText("\t")
+        isCtrlPressed && key == "-" -> {
+            moveCursorText(false)
+            movingCursor = true
+        }
+
+        isCtrlPressed && key == "=" -> {
+            moveCursorText(true)
+            movingCursor = true
+        }
+
+        isAltPressed && key == "=" -> {
+            toggleKeyboard()
+            movingCursor = true
+            Log.d(TAG, "сработало альт энтер")
+        }
+
+        else -> {
+            val charToSend = getKeyInputText(key)
+            sendText(charToSend)
         }
     }
 
-    private fun handleShift() {
-        when {
-            isCapsLock && isShiftPressed -> {
-                isCapsLock = false
-                isShiftPressed = false
-            }
+    //сброс ctrl и alt после комбинации
+    if ((isCtrlPressed || isAltPressed) && !movingCursor) {
+        resetModifiers()
+        movingCursor = false
+    }
 
-            isShiftPressed -> {
-                isCapsLock = true
-            }
-
-            else -> isShiftPressed = true
-        }
+    // Снимаем Shift после одного символа, если не включен CapsLock
+    if (isShiftPressed && !isCapsLock) {
+        isShiftPressed = false
         updateKeyboardState()
     }
+}
 
-    private fun handleKeyPress(key: String) {
-        var movingCursor = false
-        when {
-            isCtrlPressed && key == "c" -> copyText()
-            isCtrlPressed && key == "v" -> pasteText()
-            isCtrlPressed && key == "x" -> cutText()
-            //собственные комбинации | myself combinations
-            isCtrlPressed && key == "a" -> selectAllText()
-            isAltPressed && key == "t" -> rulangSendTextYo()
-            isCtrlPressed && key == "t" -> sendText("\t")
-            isCtrlPressed && key == "-" -> {
-                moveCursorText(false)
-                movingCursor = true
-            }
+private fun moveCursorText(moveForward: Boolean) {
+    safeInputConnection { ic ->
+        val textBefore = ic.getTextBeforeCursor(10000, 0)?.toString() ?: ""
+        val currentPosition = textBefore.length
+        val newPosition: Int
 
-            isCtrlPressed && key == "=" -> {
-                moveCursorText(true)
-                movingCursor = true
-            }
-
-            else -> {
-                val charToSend = getKeyDisplayText(key)
-                sendText(charToSend)
-            }
-        }
-
-        //сброс ctrl и alt после комбинации
-        if ((isCtrlPressed || isAltPressed) && !movingCursor) {
-            resetModifiers()
-            movingCursor = false
-        }
-
-        // Снимаем Shift после одного символа, если не включен CapsLock
-        if (isShiftPressed && !isCapsLock) {
-            isShiftPressed = false
-            updateKeyboardState()
-        }
-    }
-
-    private fun moveCursorText(moveForward: Boolean) {
-        safeInputConnection { ic ->
-            val textBefore = ic.getTextBeforeCursor(10000, 0)?.toString() ?: ""
-            val currentPosition = textBefore.length
-            val newPosition: Int
-
-            if (moveForward) {
-                val textAfter = ic.getTextAfterCursor(10000, 0)?.toString() ?: ""
-                if (textAfter.isEmpty()) return@safeInputConnection
-                newPosition = maxOf(0, currentPosition + 1)
-            } else {
-                if (currentPosition == 0) return@safeInputConnection
-                newPosition = maxOf(0, currentPosition - 1)
-            }
-
-            ic.setSelection(newPosition, newPosition)
-        }
-    }
-
-    private fun safeInputConnection(action: (InputConnection) -> Unit) {
-        currentInputConnection?.let(action) ?: run {
-            Log.w(TAG, "InputConnection in null")
-        }
-    }
-
-    private fun copyText() {
-        safeInputConnection { ic ->
-            currentInputConnection?.performContextMenuAction(android.R.id.copy)
-        }
-    }
-
-    private fun rulangSendTextYo() {
-        if (isShiftPressed) sendText("Ё") else sendText("ё")
-    }
-
-    private fun pasteText() {
-        safeInputConnection { ic ->
-            ic.performContextMenuAction(android.R.id.paste)
-        }
-    }
-
-    private fun cutText() {
-        safeInputConnection { ic ->
-            ic.performContextMenuAction(android.R.id.cut)
-        }
-    }
-
-    private fun selectAllText() {
-        safeInputConnection { ic ->
-            ic.performContextMenuAction(android.R.id.selectAll)
-        }
-    }
-
-    private fun handleBackspace() {
-        val ic = currentInputConnection ?: return
-
-        if (hasSelectedText()) {
-            ic.commitText("", 1)
+        if (moveForward) {
+            val textAfter = ic.getTextAfterCursor(10000, 0)?.toString() ?: ""
+            if (textAfter.isEmpty()) return@safeInputConnection
+            newPosition = maxOf(0, currentPosition + 1)
         } else {
-            if (isCtrlPressed) {
-                deleteWordBeforeCursor()
-                if (!isBackspaceLongPress) {
-                    resetModifiers()
-                }
-            } else {
-                ic.deleteSurroundingText(1, 0)
+            if (currentPosition == 0) return@safeInputConnection
+            newPosition = maxOf(0, currentPosition - 1)
+        }
+
+        ic.setSelection(newPosition, newPosition)
+    }
+}
+
+private fun safeInputConnection(action: (InputConnection) -> Unit) {
+    currentInputConnection?.let(action) ?: run {
+        Log.w(TAG, "InputConnection in null")
+    }
+}
+
+private fun copyText() {
+    safeInputConnection { ic ->
+        currentInputConnection?.performContextMenuAction(android.R.id.copy)
+    }
+}
+
+private fun rulangSendTextYo() {
+    if (isShiftPressed) sendText("Ё") else sendText("ё")
+}
+
+private fun pasteText() {
+    safeInputConnection { ic ->
+        ic.performContextMenuAction(android.R.id.paste)
+    }
+}
+
+private fun cutText() {
+    safeInputConnection { ic ->
+        ic.performContextMenuAction(android.R.id.cut)
+    }
+}
+
+private fun selectAllText() {
+    safeInputConnection { ic ->
+        ic.performContextMenuAction(android.R.id.selectAll)
+    }
+}
+
+private fun handleBackspace() {
+    val ic = currentInputConnection ?: return
+
+    if (hasSelectedText()) {
+        ic.commitText("", 1)
+    } else {
+        if (isCtrlPressed) {
+            deleteWordBeforeCursor()
+            if (!isBackspaceLongPress) {
+                resetModifiers()
             }
-        }
-    }
-
-    private fun handleEnter() {
-        safeInputConnection { ic ->
-            ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER))
-            ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER))
-        }
-    }
-
-    private fun sendText(text: String) {
-        try {
-            currentInputConnection?.commitText(text, 1)
-        } catch (e: Exception) {
-            Log.e(TAG, "Error sending text", e)
-        }
-    }
-
-    override fun onStartInput(info: EditorInfo?, restarting: Boolean) {
-        super.onStartInput(info, restarting)
-        Log.d(TAG, "onStartInput called")
-    }
-
-    override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
-        super.onStartInputView(info, restarting)
-        Log.d(TAG, "onStartInputView called")
-    }
-
-    override fun onEvaluateInputViewShown(): Boolean {
-        super.onEvaluateInputViewShown()
-        Log.d(TAG, "onEvaluateInputViewShown called")
-        return true
-    }
-
-    override fun onShowInputRequested(flags: Int, configChange: Boolean): Boolean {
-        Log.d(TAG, "onShowInputRequested called")
-        return true
-    }
-
-    private fun handleDelete() {
-        val ic = currentInputConnection ?: return
-
-        if (hasSelectedText()) {
-            ic.commitText("", 1)
         } else {
-            if (isCtrlPressed) {
-                deleteWordAfterCursor()
-                if (!isDelLongPress) {
-                    resetModifiers()
-                }
-            } else {
-                ic.deleteSurroundingText(0, 1)
+            ic.deleteSurroundingText(1, 0)
+        }
+    }
+}
+
+private fun handleEnter() {
+    safeInputConnection { ic ->
+        ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER))
+        ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER))
+    }
+}
+
+private fun sendText(text: String) {
+    try {
+        currentInputConnection?.commitText(text, 1)
+    } catch (e: Exception) {
+        Log.e(TAG, "Error sending text", e)
+    }
+}
+
+override fun onStartInput(info: EditorInfo?, restarting: Boolean) {
+    super.onStartInput(info, restarting)
+    Log.d(TAG, "onStartInput called")
+}
+
+override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
+    super.onStartInputView(info, restarting)
+//        Log.d(TAG, "onStartInputView called")
+    if (!isNumpadForced) {
+        val shouldShowNumpad = shouldShowNumpadKeyboard(info)
+
+        if (shouldShowNumpad && currentKeyboardType != KeyboardType.NUMPAD) {
+            currentKeyboardType = KeyboardType.NUMPAD
+            updateInputView()
+        } else if (!shouldShowNumpad && currentKeyboardType != KeyboardType.MAIN) {
+            currentKeyboardType = KeyboardType.MAIN
+            updateInputView()
+        }
+    }
+
+    speedDelete = getSpeedDelete().toLong()
+}
+
+private fun shouldShowNumpadKeyboard(info: EditorInfo?): Boolean {
+    if (info == null) return false
+
+    val inputType = info.inputType
+    return when (inputType and EditorInfo.TYPE_MASK_CLASS) {
+        EditorInfo.TYPE_CLASS_NUMBER,
+        EditorInfo.TYPE_CLASS_PHONE,
+        EditorInfo.TYPE_CLASS_DATETIME -> true
+
+        EditorInfo.TYPE_CLASS_TEXT -> {
+            val variation = inputType and EditorInfo.TYPE_MASK_VARIATION
+            variation == EditorInfo.TYPE_TEXT_VARIATION_EMAIL_ADDRESS ||
+                    variation == EditorInfo.TYPE_TEXT_VARIATION_PASSWORD ||
+                    variation == EditorInfo.TYPE_TEXT_VARIATION_URI ||
+                    variation == EditorInfo.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
+        }
+
+        else -> false
+    }
+}
+
+override fun onEvaluateInputViewShown(): Boolean {
+    super.onEvaluateInputViewShown()
+    Log.d(TAG, "onEvaluateInputViewShown called")
+    return true
+}
+
+override fun onShowInputRequested(flags: Int, configChange: Boolean): Boolean {
+    Log.d(TAG, "onShowInputRequested called")
+    return true
+}
+
+private fun handleDelete() {
+    val ic = currentInputConnection ?: return
+
+    if (hasSelectedText()) {
+        ic.commitText("", 1)
+    } else {
+        if (isCtrlPressed) {
+            deleteWordAfterCursor()
+            if (!isDelLongPress) {
+                resetModifiers()
             }
+        } else {
+            ic.deleteSurroundingText(0, 1)
         }
     }
+}
 
-    private fun hasSelectedText(): Boolean {
-        val ic = currentInputConnection ?: return false
-        val selectedText = ic.getSelectedText(0)
-        return selectedText != null && selectedText.isNotEmpty()
+private fun hasSelectedText(): Boolean {
+    val ic = currentInputConnection ?: return false
+    val selectedText = ic.getSelectedText(0)
+    return selectedText != null && selectedText.isNotEmpty()
+}
+
+// Удаление слова перед курсором (Ctrl+Backspace)
+private fun deleteWordBeforeCursor() {
+    val ic = currentInputConnection ?: return
+    val textBeforeCursor = ic.getTextBeforeCursor(10000, 0)?.toString() ?: return
+    val punctuation = "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~"
+
+    if (textBeforeCursor.isEmpty()) return
+
+    //find position for start deleting
+    var startIndex = textBeforeCursor.length - 1
+    var foundNonSpace = false
+
+    //go at cursor to back
+    while (startIndex >= 0) {
+        if (!textBeforeCursor[startIndex].isWhitespace() && textBeforeCursor[startIndex] !in punctuation) {
+            foundNonSpace = true
+        } else if (foundNonSpace) {
+            startIndex++
+            break
+        }
+        startIndex--
     }
 
-    // Удаление слова перед курсором (Ctrl+Backspace)
-    private fun deleteWordBeforeCursor() {
-        val ic = currentInputConnection ?: return
-        val textBeforeCursor = ic.getTextBeforeCursor(10000, 0)?.toString() ?: return
-        val punctuation = "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~"
+    //if go to start string
+    if (startIndex < 0) startIndex = 0
 
-        if (textBeforeCursor.isEmpty()) return
+    val charsToDelete = textBeforeCursor.length - startIndex
+    if (charsToDelete > 0) {
+        ic.deleteSurroundingText(charsToDelete, 0)
+    }
+}
 
-        //find position for start deleting
-        var startIndex = textBeforeCursor.length - 1
-        var foundNonSpace = false
+// Удаление слова после курсора (Ctrl+Delete)
+private fun deleteWordAfterCursor() {
+    val ic = currentInputConnection ?: return
+    val textAfterCursor = ic.getTextAfterCursor(10000, 0)?.toString() ?: return
+    val punctuation = "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~"
 
-        //go at cursor to back
-        while (startIndex >= 0) {
-            if (!textBeforeCursor[startIndex].isWhitespace() && textBeforeCursor[startIndex] !in punctuation) {
-                foundNonSpace = true
-            } else if (foundNonSpace) {
-                startIndex++
-                break
-            }
-            startIndex--
+    if (textAfterCursor.isEmpty()) return
+
+    //finding position to end deleting
+    var endIndex = 0
+    var foundNonSpace = false
+
+    //go at cursor to forward
+    while (endIndex < textAfterCursor.length) {
+        if (!textAfterCursor[endIndex].isWhitespace() && textAfterCursor[endIndex] !in punctuation) {
+            foundNonSpace = true
+        } else if (foundNonSpace) {
+            break
         }
-
-        //if go to start string
-        if (startIndex < 0) startIndex = 0
-
-        val charsToDelete = textBeforeCursor.length - startIndex
-        if (charsToDelete > 0) {
-            ic.deleteSurroundingText(charsToDelete, 0)
-        }
+        endIndex++
     }
 
-    // Удаление слова после курсора (Ctrl+Delete)
-    private fun deleteWordAfterCursor() {
-        val ic = currentInputConnection ?: return
-        val textAfterCursor = ic.getTextAfterCursor(10000, 0)?.toString() ?: return
-        val punctuation = "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~"
-
-        if (textAfterCursor.isEmpty()) return
-
-        //finding position to end deleting
-        var endIndex = 0
-        var foundNonSpace = false
-
-        //go at cursor to forward
-        while (endIndex < textAfterCursor.length) {
-            if (!textAfterCursor[endIndex].isWhitespace() && textAfterCursor[endIndex] !in punctuation) {
-                foundNonSpace = true
-            } else if (foundNonSpace) {
-                break
-            }
-            endIndex++
-        }
-
-        if (endIndex > 0) {
-            ic.deleteSurroundingText(0, endIndex)
-        }
+    if (endIndex > 0) {
+        ic.deleteSurroundingText(0, endIndex)
     }
+}
 }

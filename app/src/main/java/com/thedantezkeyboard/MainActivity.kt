@@ -7,27 +7,29 @@ import android.view.inputmethod.InputMethodManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.thedantezkeyboard.ui.theme.ThedantezkeyboardTheme
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
-import androidx.compose.foundation.layout.Row
-import androidx.compose.ui.graphics.Color
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -49,6 +51,9 @@ class MainActivity : ComponentActivity() {
 fun KeyboardSetupScreen() {
     val context = LocalContext.current
     var emptyRowEnabled by remember { mutableStateOf(Preferences.isEmptyRowEnabled(context)) }
+    var fontsize by remember { mutableStateOf(Preferences.getFontSize(context)) }
+    var speeddelete by remember { mutableStateOf(Preferences.getSpeedDelete(context).toFloat()) }
+    var alwaysBigSymbsEnabled by remember { mutableStateOf(Preferences.isBigSymbsEnabled(context)) }
 
     Column(modifier = Modifier.padding(16.dp)) {
         Button(
@@ -107,6 +112,77 @@ fun KeyboardSetupScreen() {
             modifier = Modifier.padding(6.dp),
             color = Color(150, 150, 150)
         )
+
+        Row() {}
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(8.dp)
+        ) {
+            Text(
+                "Switch always uppercase",
+                modifier = Modifier.weight(1f)
+            )
+            Switch(
+                checked = alwaysBigSymbsEnabled,
+                {
+                    alwaysBigSymbsEnabled = it
+                    Preferences.setBigSymbsEnabled(context, it)
+                }
+            )
+        }
+
+        Row() {}
+
+        Row( //slider for change font size
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(8.dp)
+        ) {
+            Text(
+                "Font size: ${fontsize.toInt()} ",
+                modifier = Modifier.weight(1f)
+            )
+            Slider(
+                value = fontsize,
+                onValueChange = { newSize ->
+                    fontsize = newSize
+                    Preferences.setFontSize(context, newSize)
+                },
+                valueRange = 12f..24f, // Диапазон размеров
+                steps = 11, // Шаги (12, 13, 14...24)
+                modifier = Modifier.weight(2f)
+            )
+        }
+        Row() {}
+
+        Row(    //slider for change volume delete
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(8.dp)
+        ) {
+            Text(
+                "Speed delete ${speeddelete.toInt()} ",
+                modifier = Modifier.weight(1f)
+            )
+            Slider(
+                value = speeddelete,
+                onValueChange = { newSpeed ->
+                    speeddelete = newSpeed
+                    Preferences.setSpeedDelete(context, newSpeed.toInt())
+                },
+                valueRange = 10f..500f,
+                steps = 24,
+                modifier = Modifier.weight(2f)
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                text = "more speed = slower deleting",
+                textAlign = TextAlign.End,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
     }
 }
 

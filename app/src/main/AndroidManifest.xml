@@ -25,7 +25,7 @@
         </activity>
 
         <service
-            android:name=".PCKeyboardService"
+            android:name=".ThedantezKeyboardService"
             android:label="Thedantez Keyboard"
             android:icon="@mipmap/ic_launcher"
             android:permission="android.permission.BIND_INPUT_METHOD"
