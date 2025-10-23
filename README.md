@@ -30,6 +30,8 @@ ru:
   ctrl + - = сдвиг курсора назад
 
   ctrl + = = сдвиг курсора вперёд
+
+  alt + = = открытие NumPad'a
  
  клавиатуру можно доделать по своему желанию
  
@@ -63,7 +65,9 @@ en:
 
   ctrl + - = move cursor forward
 
-  u can resume dev at will
+  alt + = = open NumPad 
+
+ u can resume dev at will
   
 **path to .apk file:**
   [https://github.com/dantez004/thedantezkeyboard/blob/main/apk/thedantezkeyboard.apk](https://github.com/dantez004/thedantezkeyboard/tree/main/apk)
