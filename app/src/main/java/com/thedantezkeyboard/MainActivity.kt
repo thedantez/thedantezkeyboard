@@ -54,6 +54,8 @@ fun KeyboardSetupScreen() {
     var fontsize by remember { mutableStateOf(Preferences.getFontSize(context)) }
     var speeddelete by remember { mutableStateOf(Preferences.getSpeedDelete(context).toFloat()) }
     var alwaysBigSymbsEnabled by remember { mutableStateOf(Preferences.isBigSymbsEnabled(context)) }
+    var gestureSensitivity by remember { mutableStateOf(Preferences.getGestureSensitivity(context).toFloat()) }
+    var cursorSpeed by remember { mutableStateOf(Preferences.getCursorSpeed(context).toFloat()) }
 
     Column(modifier = Modifier.padding(16.dp)) {
         Button(
@@ -179,6 +181,77 @@ fun KeyboardSetupScreen() {
         ) {
             Text(
                 text = "more speed = slower deleting",
+                textAlign = TextAlign.End,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                text = "more speed = slower deleting",
+                textAlign = TextAlign.End,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        Row() {}
+
+        Row(    //slider for gesture sensitivity
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(8.dp)
+        ) {
+            Text(
+                "Gesture sensitivity: ${gestureSensitivity.toInt()}",
+                modifier = Modifier.weight(1f)
+            )
+            Slider(
+                value = gestureSensitivity,
+                onValueChange = { newSensitivity ->
+                    gestureSensitivity = newSensitivity
+                    Preferences.setGestureSensitivity(context, newSensitivity.toInt())
+                },
+                valueRange = 10f..150f, // Минимум 10, максимум 150 пикселей
+                steps = 13, // 14 значений от 10 до 150
+                modifier = Modifier.weight(2f)
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                text = "Higher value = more movement needed to start gesture",
+                textAlign = TextAlign.End,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        Row() {}
+
+        Row(    //slider for cursor speed
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(8.dp)
+        ) {
+            Text(
+                "Cursor speed: ${cursorSpeed.toInt()}",
+                modifier = Modifier.weight(1f)
+            )
+            Slider(
+                value = cursorSpeed,
+                onValueChange = { newSpeed ->
+                    cursorSpeed = newSpeed
+                    Preferences.setCursorSpeed(context, newSpeed.toInt())
+                },
+                valueRange = 10f..100f, // Минимум 10мс, максимум 100мс задержки
+                steps = 8, // 9 значений от 10 до 100
+                modifier = Modifier.weight(2f)
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                text = "Higher value = slower cursor movement",
                 textAlign = TextAlign.End,
                 modifier = Modifier.fillMaxWidth()
             )

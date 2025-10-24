@@ -166,6 +166,14 @@ class ThedantezKeyboardService : InputMethodService() {
         return Preferences.getSpeedDelete(this)
     }
 
+    private fun getGestureSensitivity(): Int {
+        return Preferences.getGestureSensitivity(this)
+    }
+
+    private fun getCursorSpeed(): Int {
+        return Preferences.getCursorSpeed(this)
+    }
+
     private fun getKeyInputText(key: String): String {
         if (currentKeyboardType == KeyboardType.NUMPAD) {
             return key
@@ -251,7 +259,7 @@ class ThedantezKeyboardService : InputMethodService() {
             orientation = LinearLayout.HORIZONTAL
             layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
         }
-        listOf("7", "8", "9", "+").forEach { key ->
+        listOf("+", "7", "8", "9").forEach { key ->
             addKeyToRow(row1, key, 1f)
         }
         addKeyToRow(row1, "BS", 1.5f, ::handleBackspace, true)
@@ -261,7 +269,7 @@ class ThedantezKeyboardService : InputMethodService() {
             orientation = LinearLayout.HORIZONTAL
             layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
         }
-        listOf("4", "5", "6", "-").forEach { key ->
+        listOf("-", "4", "5", "6").forEach { key ->
             addKeyToRow(row2, key, 1f)
         }
         addKeyToRow(row2, "DEL", 1.5f, ::handleDelete, true)
@@ -271,7 +279,7 @@ class ThedantezKeyboardService : InputMethodService() {
             orientation = LinearLayout.HORIZONTAL
             layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
         }
-        listOf("1", "2", "3", "*").forEach { key ->
+        listOf("*", "1", "2", "3").forEach { key ->
             addKeyToRow(row3, key, 1f)
         }
         addKeyToRow(row3, "ENTR", 1.5f, ::handleEnter, true)
@@ -281,10 +289,11 @@ class ThedantezKeyboardService : InputMethodService() {
             orientation = LinearLayout.HORIZONTAL
             layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
         }
-        addKeyToRow(row4, "0", 2f)
-        addKeyToRow(row4, ".", 1f)
         addKeyToRow(row4, "/", 1f)
-        addKeyToRow(row4, "MAIN", 1.5f, ::switchToMainKeyboard, true)
+        addKeyToRow(row4, "0", 1.3f)
+        addKeyToRow(row4, ".", 1f)
+        addSpaceKeyToRow(row4, 1.1f)
+        addKeyToRow(row4, "MAIN", 1.1f, ::switchToMainKeyboard, true)
 
         if (isEmptyRowEnabled()) {
             val emptyrow5 = LinearLayout(this).apply {
@@ -419,8 +428,8 @@ class ThedantezKeyboardService : InputMethodService() {
     @SuppressLint("ClickableViewAccessibility")
     private fun addSpaceKeyToRow(row: LinearLayout, weight: Float) {
         val button = Button(this).apply {
-            tag = "Space"
-            text = "Space"
+            tag = "SPACE"
+            text = "SPACE"
             layoutParams = LayoutParams(0, 150, weight).apply {
                 setMargins(2, 2, 2, 2)
             }
@@ -443,11 +452,28 @@ class ThedantezKeyboardService : InputMethodService() {
                     }
 
                     MotionEvent.ACTION_MOVE -> {
+//                        if (!isSpaceGestureActive) {
+//                            // Проверяем превышение порога для активации жеста
+//                            val dx = abs(event.rawX - spaceInitialX)
+//                            val dy = abs(event.rawY - spaceInitialY)
+//                            val gestureThreshold = 100f // Порог чувствительности жеста (в пикселях)
+//
+//                            if (dx > gestureThreshold || dy > gestureThreshold) {
+//                                isSpaceGestureActive = true
+//                            }
+//                        }
+//
+//                        if (isSpaceGestureActive) {
+//                            // Обработка перемещения курсора
+//                            val currentTime = System.currentTimeMillis()
+//                            val moveDelay =
+//                                if (isCtrlPressed) 100L else 0L //задержка между перемещениями (мс)
+//                            if (currentTime - lastMoveTime > moveDelay) {
                         if (!isSpaceGestureActive) {
                             // Проверяем превышение порога для активации жеста
                             val dx = abs(event.rawX - spaceInitialX)
                             val dy = abs(event.rawY - spaceInitialY)
-                            val gestureThreshold = 100f // Порог чувствительности жеста (в пикселях)
+                            val gestureThreshold = getGestureSensitivity().toFloat() // Порог чувствительности жеста
 
                             if (dx > gestureThreshold || dy > gestureThreshold) {
                                 isSpaceGestureActive = true
@@ -457,8 +483,7 @@ class ThedantezKeyboardService : InputMethodService() {
                         if (isSpaceGestureActive) {
                             // Обработка перемещения курсора
                             val currentTime = System.currentTimeMillis()
-                            val moveDelay =
-                                if (isCtrlPressed) 100L else 0L //задержка между перемещениями (мс)
+                            val moveDelay = getCursorSpeed().toLong() // задержка между перемещениями (мс)
                             if (currentTime - lastMoveTime > moveDelay) {
                                 handleSpaceGesture(event.rawX, event.rawY)
                                 lastMoveTime = currentTime
@@ -719,11 +744,20 @@ class ThedantezKeyboardService : InputMethodService() {
         updateKeyboardState()
     }
 
-    private fun updateKeyboardState() {
-        bigSymbsEnabled = isBigSymbsEnabled()
-        speedDelete = getSpeedDelete().toLong()
+//    private fun updateKeyboardState() {
+//        bigSymbsEnabled = isBigSymbsEnabled()
+//        speedDelete = getSpeedDelete().toLong()
+//
+//        handler.post {
+private fun updateKeyboardState() {
+    bigSymbsEnabled = isBigSymbsEnabled()
+    speedDelete = getSpeedDelete().toLong()
+    // Обновляем настройки жестов для активной клавиатуры
+    if (currentKeyboardType == KeyboardType.MAIN) {
+        // Настройки жестов применяются динамически при движении
+    }
 
-        handler.post {
+    handler.post {
             keyboardView?.let { root ->
                 when (currentKeyboardType) {
                     KeyboardType.MAIN -> {
@@ -913,7 +947,6 @@ override fun onStartInput(info: EditorInfo?, restarting: Boolean) {
 
 override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
     super.onStartInputView(info, restarting)
-//        Log.d(TAG, "onStartInputView called")
     if (!isNumpadForced) {
         val shouldShowNumpad = shouldShowNumpadKeyboard(info)
 
