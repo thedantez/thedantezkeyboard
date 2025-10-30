@@ -226,9 +226,6 @@ class ThedantezKeyboardService : InputMethodService() {
     }
 
     override fun onCreateInputView(): View {
-//        return createKeyboardView().also {
-//            keyboardView = it
-//        }
         return when (currentKeyboardType) {
             ThedantezKeyboardService.KeyboardType.MAIN -> createKeyboardView().also {
                 keyboardView = it
@@ -312,12 +309,14 @@ class ThedantezKeyboardService : InputMethodService() {
 
     // Функции переключения клавиатур
     private fun switchToMainKeyboard() {
+        resetModifiers()
         currentKeyboardType = KeyboardType.MAIN
         isNumpadForced = false
         updateInputView()
     }
 
     private fun switchToNumpadKeyboard() {
+        resetModifiers()
         currentKeyboardType = KeyboardType.NUMPAD
         isNumpadForced = true
         updateInputView()
@@ -813,10 +812,20 @@ private fun handleShift() {
 private fun handleKeyPress(key: String) {
     var movingCursor = false
     when {
+        //комбинации | combinations
+        isCtrlPressed && key == "z" -> {
+            safeInputConnection { ic ->
+                ic.performContextMenuAction(android.R.id.undo)
+            }
+        }
+        isCtrlPressed && key == "y" -> {
+            safeInputConnection { ic ->
+                ic.performContextMenuAction(android.R.id.redo)
+            }
+        }
         isCtrlPressed && key == "c" -> copyText()
         isCtrlPressed && key == "v" -> pasteText()
         isCtrlPressed && key == "x" -> cutText()
-        //собственные комбинации | myself combinations
         isCtrlPressed && key == "a" -> selectAllText()
         isAltPressed && key == "t" -> rulangSendTextYo()
         isCtrlPressed && key == "t" -> sendText("\t")
@@ -920,7 +929,10 @@ private fun handleBackspace() {
                 resetModifiers()
             }
         } else {
-            ic.deleteSurroundingText(1, 0)
+//            old version
+//            ic.deleteSurroundingText(1, 0)
+            ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL))
+            ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DEL))
         }
     }
 }
@@ -1006,7 +1018,10 @@ private fun handleDelete() {
                 resetModifiers()
             }
         } else {
-            ic.deleteSurroundingText(0, 1)
+//            old version
+//            ic.deleteSurroundingText(0, 1)
+            ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_FORWARD_DEL))
+            ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_FORWARD_DEL))
         }
     }
 }
