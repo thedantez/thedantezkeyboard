@@ -128,8 +128,8 @@ fun SensitivityTab() {
                     speeddelete = newSpeed
                     Preferences.setSpeedDelete(context, newSpeed.toInt())
                 },
-                valueRange = 10f..500f,
-                steps = 24,
+                valueRange = 30f..300f,
+                steps = 11,
                 modifier = Modifier.weight(2f)
             )
         }
@@ -317,7 +317,7 @@ fun ButtonsTab() {
                     Preferences.setButtonHeight(context, newHeight.toInt())
                 },
                 valueRange = 80f..200f,
-                steps = 10,
+                steps = 11,
                 modifier = Modifier.weight(2f)
             )
         }

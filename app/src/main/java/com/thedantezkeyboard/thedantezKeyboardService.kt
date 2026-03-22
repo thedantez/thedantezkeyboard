@@ -257,6 +257,7 @@ class ThedantezKeyboardService : InputMethodService() {
         // Ряд 1: 7 8 9 +
         val row1 = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
+            orientation = LinearLayout.HORIZONTAL
             layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
         }
         listOf("+", "7", "8", "9").forEach { key ->
@@ -352,7 +353,7 @@ class ThedantezKeyboardService : InputMethodService() {
             isVerticalScrollBarEnabled = false
         }
 
-        // Ряд 1: 1 2 3 4 5 6 7 8 9 0 - = Backspace
+        // Ряд 1: del 1 2 3 4 5 6 7 8 9 0 - = bs
         val row1 = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
@@ -360,11 +361,15 @@ class ThedantezKeyboardService : InputMethodService() {
 
         val delVisible = Preferences.isShowDEL(this)
         if (delVisible) {
-            addKeyToRow(row1, "DEL", 1.5f, ::handleDelete, true)
+            addKeyToRow(row1, "", 0.5f, ::handleDelete, true)
         }
         val digitsWeight = if (delVisible) 1f else 1.2f
         listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-", "=").forEach { key ->
             addKeyToRow(row1, key, digitsWeight)
+        }
+        val bsVisible = Preferences.isShowBS(this)
+        if (bsVisible) {
+            addKeyToRow(row1, "", 0.5f, ::handleBackspace, true)
         }
 
         // Ряд 2: q w e r t y u i o p [ ] \
@@ -373,7 +378,7 @@ class ThedantezKeyboardService : InputMethodService() {
             layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
         }
         listOf("q", "w", "e", "r", "t", "y", "u", "i", "o", "p", "[", "]", "\\").forEach { key ->
-            addKeyToRow(row2, key, 1f)
+            addKeyToRow(row2, key, 1.2f)
         }
 
         // Ряд 3: a s d f g h j k l ; '
@@ -381,13 +386,9 @@ class ThedantezKeyboardService : InputMethodService() {
             orientation = LinearLayout.HORIZONTAL
             layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
         }
-        val bsVisible = Preferences.isShowBS(this)
-        val row3Weight = if (bsVisible) 1f else 1.2f
+
         listOf("a", "s", "d", "f", "g", "h", "j", "k", "l", ";", "'").forEach { key ->
-            addKeyToRow(row3, key, row3Weight)
-        }
-        if (bsVisible) {
-            addKeyToRow(row3, "BS", 1.5f, ::handleBackspace, true)
+            addKeyToRow(row3, key, 1.2f)
         }
 
         // Ряд 4: Shift z x c v b n m , . / En/Ru
@@ -414,16 +415,6 @@ class ThedantezKeyboardService : InputMethodService() {
 
         val ctrlVisible = Preferences.isShowCtrl(this)
         val altVisible = Preferences.isShowAlt(this)
-//        old version
-//        addModifierButton(row5, "CTRL", 1.25f, { toggleModifier("CTRL") }, isCtrlPressed)
-//        addSpaceKeyToRow(row5, 4.5f)
-//        addModifierButton(row5, "ALT", 1.25f, { toggleModifier("ALT") }, isAltPressed)
-//        addKeyToRow(row5, "ENTR", 1.5f, ::handleEnter, true)
-//        new version
-//        val modifierItems = mutableListOf<Triple<String, Float, () -> Unit>>()
-//        if (ctrlVisible) modifierItems.add(Triple("CTRL", 1.25f, { toggleModifier("CTRL") }))
-//        if (altVisible) modifierItems.add(Triple("ALT", 1.25f, { toggleModifier("ALT") }))
-
         if (ctrlVisible) {
             addModifierButton(row5, "CTRL", 1.25f, { toggleModifier("CTRL") }, isCtrlPressed)
         }
@@ -535,6 +526,7 @@ class ThedantezKeyboardService : InputMethodService() {
                         if (!isSpaceGestureActive) {
                             if (isAltPressed) {
                                 toggleLanguage()
+                                resetModifiers()
                             } else {
                                 // Если жест не активирован - вводим пробел
                                 sendText(" ")
