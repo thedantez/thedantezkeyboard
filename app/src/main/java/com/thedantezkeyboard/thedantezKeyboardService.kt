@@ -15,6 +15,7 @@ import android.widget.LinearLayout.LayoutParams
 import android.view.MotionEvent
 import android.os.Handler
 import android.os.Looper
+import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.core.content.ContextCompat
 import kotlin.math.abs
@@ -153,6 +154,8 @@ class ThedantezKeyboardService : InputMethodService() {
     private fun isEmptyRowEnabled(): Boolean {
         return Preferences.isEmptyRowEnabled(this)
     }
+
+    private fun getButtonHeight() = Preferences.getButtonHeight(this)
 
     private fun isBigSymbsEnabled(): Boolean {
         return Preferences.isBigSymbsEnabled(this)
@@ -354,9 +357,14 @@ class ThedantezKeyboardService : InputMethodService() {
             orientation = LinearLayout.HORIZONTAL
             layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
         }
-        addKeyToRow(row1, "DEL", 1.5f, ::handleDelete, true)
+
+        val delVisible = Preferences.isShowDEL(this)
+        if (delVisible) {
+            addKeyToRow(row1, "DEL", 1.5f, ::handleDelete, true)
+        }
+        val digitsWeight = if (delVisible) 1f else 1.2f
         listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-", "=").forEach { key ->
-            addKeyToRow(row1, key, 1f)
+            addKeyToRow(row1, key, digitsWeight)
         }
 
         // Ряд 2: q w e r t y u i o p [ ] \
@@ -373,30 +381,70 @@ class ThedantezKeyboardService : InputMethodService() {
             orientation = LinearLayout.HORIZONTAL
             layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
         }
+        val bsVisible = Preferences.isShowBS(this)
+        val row3Weight = if (bsVisible) 1f else 1.2f
         listOf("a", "s", "d", "f", "g", "h", "j", "k", "l", ";", "'").forEach { key ->
-            addKeyToRow(row3, key, 1f)
+            addKeyToRow(row3, key, row3Weight)
         }
-        addKeyToRow(row3, "BS", 1.5f, ::handleBackspace, true)
+        if (bsVisible) {
+            addKeyToRow(row3, "BS", 1.5f, ::handleBackspace, true)
+        }
 
         // Ряд 4: Shift z x c v b n m , . / En/Ru
         val row4 = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
         }
+        val enruVisible = Preferences.isShowENRU(this)
+        val row4Weight = if (enruVisible) 1f else 1.2f
+
         addModifierButton(row4, "SH", 1.5f, ::handleShift, isShiftPressed || isCapsLock)
         listOf("z", "x", "c", "v", "b", "n", "m", ",", ".", "/").forEach { key ->
-            addKeyToRow(row4, key, 1f)
+            addKeyToRow(row4, key, row4Weight)
         }
-        addKeyToRow(row4, "EN", 1.5f, ::toggleLanguage)
 
+        if (enruVisible) {
+            addKeyToRow(row4, "EN", 1.5f, ::toggleLanguage)
+        }
         // Ряд 5: Ctrl Space Alt Enter
         val row5 = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
         }
-        addModifierButton(row5, "CTRL", 1.25f, { toggleModifier("CTRL") }, isCtrlPressed)
-        addSpaceKeyToRow(row5, 4.5f)
-        addModifierButton(row5, "ALT", 1.25f, { toggleModifier("ALT") }, isAltPressed)
+
+        val ctrlVisible = Preferences.isShowCtrl(this)
+        val altVisible = Preferences.isShowAlt(this)
+//        old version
+//        addModifierButton(row5, "CTRL", 1.25f, { toggleModifier("CTRL") }, isCtrlPressed)
+//        addSpaceKeyToRow(row5, 4.5f)
+//        addModifierButton(row5, "ALT", 1.25f, { toggleModifier("ALT") }, isAltPressed)
+//        addKeyToRow(row5, "ENTR", 1.5f, ::handleEnter, true)
+//        new version
+//        val modifierItems = mutableListOf<Triple<String, Float, () -> Unit>>()
+//        if (ctrlVisible) modifierItems.add(Triple("CTRL", 1.25f, { toggleModifier("CTRL") }))
+//        if (altVisible) modifierItems.add(Triple("ALT", 1.25f, { toggleModifier("ALT") }))
+
+        if (ctrlVisible) {
+            addModifierButton(row5, "CTRL", 1.25f, { toggleModifier("CTRL") }, isCtrlPressed)
+        }
+
+        val visibleModsCount = (if (ctrlVisible) 1 else 0) + (if (altVisible) 1 else 0)
+        val spaceWeight = when (visibleModsCount) {
+            0 -> 7.5f
+            1 -> 6.0f
+            else -> 4.5f
+        }
+        addSpaceKeyToRow(row5, spaceWeight)
+        if (altVisible) {
+            addModifierButton(row5, "ALT", 1.25f, { toggleModifier("ALT") }, isAltPressed)
+        }
+//        modifierItems.forEach { (tag, weight, onClick) ->
+//            addModifierButton(row5, tag, weight, onClick, when(tag) {
+//                "CTRL" -> isCtrlPressed
+//                "ALT" -> isAltPressed
+//                else -> false
+//            })
+//        }
         addKeyToRow(row5, "ENTR", 1.5f, ::handleEnter, true)
 
         val emptyrow6 = LinearLayout(this).apply {
@@ -418,7 +466,7 @@ class ThedantezKeyboardService : InputMethodService() {
 
     private fun addEmpty(row: LinearLayout, weight: Float) {
         val empty = android.widget.Space(this).apply {
-            layoutParams = LayoutParams(0, 150, weight)
+            layoutParams = LayoutParams(0, getButtonHeight(), weight)
         }
         row.addView(empty)
     }
@@ -429,7 +477,7 @@ class ThedantezKeyboardService : InputMethodService() {
         val button = Button(this).apply {
             tag = "SPACE"
             text = "SPACE"
-            layoutParams = LayoutParams(0, 150, weight).apply {
+            layoutParams = LayoutParams(0, getButtonHeight(), weight).apply {
                 setMargins(2, 2, 2, 2)
             }
             background = ContextCompat.getDrawable(context, R.drawable.rounded_button_black)
@@ -440,8 +488,10 @@ class ThedantezKeyboardService : InputMethodService() {
                 when (event.action) {
                     MotionEvent.ACTION_DOWN -> {
                         val keepCtrl = isCtrlPressed
+                        val keepAlt = isAltPressed
                         resetModifiers()
                         isCtrlPressed = keepCtrl
+                        isAltPressed = keepAlt
 
                         // Запоминаем начальную позицию касания
                         spaceInitialX = event.rawX
@@ -451,28 +501,12 @@ class ThedantezKeyboardService : InputMethodService() {
                     }
 
                     MotionEvent.ACTION_MOVE -> {
-//                        if (!isSpaceGestureActive) {
-//                            // Проверяем превышение порога для активации жеста
-//                            val dx = abs(event.rawX - spaceInitialX)
-//                            val dy = abs(event.rawY - spaceInitialY)
-//                            val gestureThreshold = 100f // Порог чувствительности жеста (в пикселях)
-//
-//                            if (dx > gestureThreshold || dy > gestureThreshold) {
-//                                isSpaceGestureActive = true
-//                            }
-//                        }
-//
-//                        if (isSpaceGestureActive) {
-//                            // Обработка перемещения курсора
-//                            val currentTime = System.currentTimeMillis()
-//                            val moveDelay =
-//                                if (isCtrlPressed) 100L else 0L //задержка между перемещениями (мс)
-//                            if (currentTime - lastMoveTime > moveDelay) {
                         if (!isSpaceGestureActive) {
                             // Проверяем превышение порога для активации жеста
                             val dx = abs(event.rawX - spaceInitialX)
                             val dy = abs(event.rawY - spaceInitialY)
-                            val gestureThreshold = getGestureSensitivity().toFloat() // Порог чувствительности жеста
+                            val gestureThreshold =
+                                getGestureSensitivity().toFloat() // Порог чувствительности жеста
 
                             if (dx > gestureThreshold || dy > gestureThreshold) {
                                 isSpaceGestureActive = true
@@ -482,7 +516,8 @@ class ThedantezKeyboardService : InputMethodService() {
                         if (isSpaceGestureActive) {
                             // Обработка перемещения курсора
                             val currentTime = System.currentTimeMillis()
-                            val moveDelay = getCursorSpeed().toLong() // задержка между перемещениями (мс)
+                            val moveDelay =
+                                getCursorSpeed().toLong() // задержка между перемещениями (мс)
                             if (currentTime - lastMoveTime > moveDelay) {
                                 handleSpaceGesture(event.rawX, event.rawY)
                                 lastMoveTime = currentTime
@@ -498,8 +533,12 @@ class ThedantezKeyboardService : InputMethodService() {
 
                     MotionEvent.ACTION_UP -> {
                         if (!isSpaceGestureActive) {
-                            // Если жест не активирован - вводим пробел
-                            sendText(" ")
+                            if (isAltPressed) {
+                                toggleLanguage()
+                            } else {
+                                // Если жест не активирован - вводим пробел
+                                sendText(" ")
+                            }
                         }
                         isSpaceGestureActive = false
                         true
@@ -521,15 +560,41 @@ class ThedantezKeyboardService : InputMethodService() {
 
         when {
             isHorizontal && dx > 0 -> {
-                if (isCtrlPressed) moveCursorToNextWord() else moveCursorRight()
+                when {
+                    isAltPressed -> moveCursorToEnd()
+                    isCtrlPressed -> moveCursorToNextWord()
+                    else -> moveCursorRight()
+                }
             }
 
             isHorizontal && dx < 0 -> {
-                if (isCtrlPressed) moveCursorToPrevWord() else moveCursorLeft()
+                when {
+                    isAltPressed -> moveCursorToHome()
+                    isCtrlPressed -> moveCursorToPrevWord()
+                    else -> moveCursorLeft()
+                }
             }
 
             !isHorizontal && dy > 10f -> moveCursorDown()
             !isHorizontal && dy < -10f -> moveCursorUp()
+        }
+    }
+
+    private fun moveCursorToEnd() {
+        safeInputConnection { ic ->
+            val now = System.currentTimeMillis()
+            val meta = if (isCtrlPressed) KeyEvent.META_CTRL_ON else 0
+            ic.sendKeyEvent(KeyEvent(now, now,KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MOVE_END, 0, meta))
+            ic.sendKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MOVE_END, 0, meta))
+        }
+    }
+
+    private fun moveCursorToHome() {
+        safeInputConnection { ic ->
+            val now = System.currentTimeMillis()
+            val meta = if (isCtrlPressed) KeyEvent.META_CTRL_ON else 0
+            ic.sendKeyEvent(KeyEvent(now, now,KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MOVE_HOME, 0, meta))
+            ic.sendKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MOVE_HOME, 0, meta))
         }
     }
 
@@ -641,7 +706,7 @@ class ThedantezKeyboardService : InputMethodService() {
         val button = Button(this).apply {
             tag = key
             text = getKeyDisplayText(key)
-            layoutParams = LayoutParams(0, 150, weight).apply {
+            layoutParams = LayoutParams(0, getButtonHeight(), weight).apply {
                 setMargins(2, 2, 2, 2)
             }
             background = when {
@@ -715,7 +780,7 @@ class ThedantezKeyboardService : InputMethodService() {
         val button = Button(this).apply {
             this.text = text
             tag = text
-            layoutParams = LayoutParams(0, 150, weight).apply {
+            layoutParams = LayoutParams(0, getButtonHeight(), weight).apply {
                 setMargins(2, 2, 2, 2)
             }
             background = ContextCompat.getDrawable(
@@ -743,20 +808,15 @@ class ThedantezKeyboardService : InputMethodService() {
         updateKeyboardState()
     }
 
-//    private fun updateKeyboardState() {
-//        bigSymbsEnabled = isBigSymbsEnabled()
-//        speedDelete = getSpeedDelete().toLong()
-//
-//        handler.post {
-private fun updateKeyboardState() {
-    bigSymbsEnabled = isBigSymbsEnabled()
-    speedDelete = getSpeedDelete().toLong()
-    // Обновляем настройки жестов для активной клавиатуры
-    if (currentKeyboardType == KeyboardType.MAIN) {
-        // Настройки жестов применяются динамически при движении
-    }
+    private fun updateKeyboardState() {
+        bigSymbsEnabled = isBigSymbsEnabled()
+        speedDelete = getSpeedDelete().toLong()
+        // Обновляем настройки жестов для активной клавиатуры
+        if (currentKeyboardType == KeyboardType.MAIN) {
+            // Настройки жестов применяются динамически при движении
+        }
 
-    handler.post {
+        handler.post {
             keyboardView?.let { root ->
                 when (currentKeyboardType) {
                     KeyboardType.MAIN -> {
@@ -773,6 +833,7 @@ private fun updateKeyboardState() {
                         updateModifierButton(root, "CTRL", isCtrlPressed)
                         updateModifierButton(root, "ALT", isAltPressed)
                     }
+
                     KeyboardType.NUMPAD -> {
                         val mainButton = root.findViewWithTag("MAIN") as? Button
                         mainButton?.text = "ABC"
@@ -782,312 +843,614 @@ private fun updateKeyboardState() {
         }
     }
 
-private fun updateModifierButton(root: View, text: String, isActive: Boolean) {
-    val button = root.findViewWithTag(text) as? Button
-    button?.apply {
-        background = ContextCompat.getDrawable(
-            context,
-            if (isActive) R.drawable.rounded_button_gray
-            else R.drawable.rounded_button_black
-        )
-    }
-}
-
-private fun handleShift() {
-    when {
-        isCapsLock && isShiftPressed -> {
-            isCapsLock = false
-            isShiftPressed = false
+    private fun updateModifierButton(root: View, text: String, isActive: Boolean) {
+        val button = root.findViewWithTag(text) as? Button
+        button?.apply {
+            background = ContextCompat.getDrawable(
+                context,
+                if (isActive) R.drawable.rounded_button_gray
+                else R.drawable.rounded_button_black
+            )
         }
-
-        isShiftPressed -> {
-            isCapsLock = true
-        }
-
-        else -> isShiftPressed = true
     }
-    updateKeyboardState()
-}
 
-private fun handleKeyPress(key: String) {
-    var movingCursor = false
-    when {
-        //комбинации | combinations
-        isCtrlPressed && key == "z" -> {
-            safeInputConnection { ic ->
-                ic.performContextMenuAction(android.R.id.undo)
+    private fun handleShift() {
+        when {
+            isCapsLock && isShiftPressed -> {
+                isCapsLock = false
+                isShiftPressed = false
             }
-        }
-        isCtrlPressed && key == "y" -> {
-            safeInputConnection { ic ->
-                ic.performContextMenuAction(android.R.id.redo)
+
+            isShiftPressed -> {
+                isCapsLock = true
             }
-        }
-        isCtrlPressed && key == "c" -> copyText()
-        isCtrlPressed && key == "v" -> pasteText()
-        isCtrlPressed && key == "x" -> cutText()
-        isCtrlPressed && key == "a" -> selectAllText()
-        isAltPressed && key == "t" -> rulangSendTextYo()
-        isCtrlPressed && key == "t" -> sendText("\t")
-        isCtrlPressed && key == "-" -> {
-            moveCursorText(false)
-            movingCursor = true
-        }
 
-        isCtrlPressed && key == "=" -> {
-            moveCursorText(true)
-            movingCursor = true
+            else -> isShiftPressed = true
         }
-
-        isAltPressed && key == "=" -> {
-            toggleKeyboard()
-            movingCursor = true
-            Log.d(TAG, "сработало альт энтер")
-        }
-
-        else -> {
-            val charToSend = getKeyInputText(key)
-            sendText(charToSend)
-        }
-    }
-
-    //сброс ctrl и alt после комбинации
-    if ((isCtrlPressed || isAltPressed) && !movingCursor) {
-        resetModifiers()
-        movingCursor = false
-    }
-
-    // Снимаем Shift после одного символа, если не включен CapsLock
-    if (isShiftPressed && !isCapsLock) {
-        isShiftPressed = false
         updateKeyboardState()
     }
-}
 
-private fun moveCursorText(moveForward: Boolean) {
-    safeInputConnection { ic ->
-        val textBefore = ic.getTextBeforeCursor(10000, 0)?.toString() ?: ""
-        val currentPosition = textBefore.length
-        val newPosition: Int
+    private fun handleKeyPress(key: String) {
+        var movingCursor = false
+        when {
+            //комбинации | combinations
+//            isCtrlPressed && key == "z" -> {
+//                val now = System.currentTimeMillis()
+//                currentInputConnection?.sendKeyEvent(
+//                    KeyEvent(
+//                        now,
+//                        now,
+//                        KeyEvent.ACTION_DOWN,
+//                        KeyEvent.KEYCODE_CTRL_LEFT,
+//                        0,
+//                        0
+//                    )
+//                )
+//                currentInputConnection?.sendKeyEvent(
+//                    KeyEvent(
+//                        now,
+//                        now,
+//                        KeyEvent.ACTION_DOWN,
+//                        KeyEvent.KEYCODE_Z,
+//                        0,
+//                        KeyEvent.META_CTRL_ON
+//                    )
+//                )
+//                currentInputConnection?.sendKeyEvent(
+//                    KeyEvent(
+//                        now,
+//                        now,
+//                        KeyEvent.ACTION_UP,
+//                        KeyEvent.KEYCODE_Z,
+//                        0,
+//                        KeyEvent.META_CTRL_ON
+//                    )
+//                )
+//                currentInputConnection?.sendKeyEvent(
+//                    KeyEvent(
+//                        now,
+//                        now,
+//                        KeyEvent.ACTION_UP,
+//                        KeyEvent.KEYCODE_CTRL_LEFT,
+//                        0,
+//                        0
+//                    )
+//                )
+//            }
+//
+//            isCtrlPressed && key == "y" -> {
+//                val now = System.currentTimeMillis()
+//                currentInputConnection?.sendKeyEvent(
+//                    KeyEvent(
+//                        now,
+//                        now,
+//                        KeyEvent.ACTION_DOWN,
+//                        KeyEvent.KEYCODE_CTRL_LEFT,
+//                        0,
+//                        0
+//                    )
+//                )
+//                currentInputConnection?.sendKeyEvent(
+//                    KeyEvent(
+//                        now,
+//                        now,
+//                        KeyEvent.ACTION_DOWN,
+//                        KeyEvent.KEYCODE_Y,
+//                        0,
+//                        KeyEvent.META_CTRL_ON
+//                    )
+//                )
+//                currentInputConnection?.sendKeyEvent(
+//                    KeyEvent(
+//                        now,
+//                        now,
+//                        KeyEvent.ACTION_UP,
+//                        KeyEvent.KEYCODE_Y,
+//                        0,
+//                        KeyEvent.META_CTRL_ON
+//                    )
+//                )
+//                currentInputConnection?.sendKeyEvent(
+//                    KeyEvent(
+//                        now,
+//                        now,
+//                        KeyEvent.ACTION_UP,
+//                        KeyEvent.KEYCODE_CTRL_LEFT,
+//                        0,
+//                        0
+//                    )
+//                )
+//            }
+//
+//            isCtrlPressed && key == "c" -> {
+//                val now = System.currentTimeMillis()
+//                currentInputConnection?.sendKeyEvent(
+//                    KeyEvent(
+//                        now,
+//                        now,
+//                        KeyEvent.ACTION_DOWN,
+//                        KeyEvent.KEYCODE_CTRL_LEFT,
+//                        0,
+//                        0
+//                    )
+//                )
+//                currentInputConnection?.sendKeyEvent(
+//                    KeyEvent(
+//                        now,
+//                        now,
+//                        KeyEvent.ACTION_DOWN,
+//                        KeyEvent.KEYCODE_C,
+//                        0,
+//                        KeyEvent.META_CTRL_ON
+//                    )
+//                )
+//                currentInputConnection?.sendKeyEvent(
+//                    KeyEvent(
+//                        now,
+//                        now,
+//                        KeyEvent.ACTION_UP,
+//                        KeyEvent.KEYCODE_C,
+//                        0,
+//                        KeyEvent.META_CTRL_ON
+//                    )
+//                )
+//                currentInputConnection?.sendKeyEvent(
+//                    KeyEvent(
+//                        now,
+//                        now,
+//                        KeyEvent.ACTION_UP,
+//                        KeyEvent.KEYCODE_CTRL_LEFT,
+//                        0,
+//                        0
+//                    )
+//                )
+//            }
+//
+//            isCtrlPressed && key == "v" -> {
+//                val now = System.currentTimeMillis()
+//                currentInputConnection?.sendKeyEvent(
+//                    KeyEvent(
+//                        now,
+//                        now,
+//                        KeyEvent.ACTION_DOWN,
+//                        KeyEvent.KEYCODE_CTRL_LEFT,
+//                        0,
+//                        0
+//                    )
+//                )
+//                currentInputConnection?.sendKeyEvent(
+//                    KeyEvent(
+//                        now,
+//                        now,
+//                        KeyEvent.ACTION_DOWN,
+//                        KeyEvent.KEYCODE_V,
+//                        0,
+//                        KeyEvent.META_CTRL_ON
+//                    )
+//                )
+//                currentInputConnection?.sendKeyEvent(
+//                    KeyEvent(
+//                        now,
+//                        now,
+//                        KeyEvent.ACTION_UP,
+//                        KeyEvent.KEYCODE_V,
+//                        0,
+//                        KeyEvent.META_CTRL_ON
+//                    )
+//                )
+//                currentInputConnection?.sendKeyEvent(
+//                    KeyEvent(
+//                        now,
+//                        now,
+//                        KeyEvent.ACTION_UP,
+//                        KeyEvent.KEYCODE_CTRL_LEFT,
+//                        0,
+//                        0
+//                    )
+//                )
+//            }
+//
+//            isCtrlPressed && key == "x" -> {
+//                val now = System.currentTimeMillis()
+//                currentInputConnection?.sendKeyEvent(
+//                    KeyEvent(
+//                        now,
+//                        now,
+//                        KeyEvent.ACTION_DOWN,
+//                        KeyEvent.KEYCODE_CTRL_LEFT,
+//                        0,
+//                        0
+//                    )
+//                )
+//                currentInputConnection?.sendKeyEvent(
+//                    KeyEvent(
+//                        now,
+//                        now,
+//                        KeyEvent.ACTION_DOWN,
+//                        KeyEvent.KEYCODE_X,
+//                        0,
+//                        KeyEvent.META_CTRL_ON
+//                    )
+//                )
+//                currentInputConnection?.sendKeyEvent(
+//                    KeyEvent(
+//                        now,
+//                        now,
+//                        KeyEvent.ACTION_UP,
+//                        KeyEvent.KEYCODE_X,
+//                        0,
+//                        KeyEvent.META_CTRL_ON
+//                    )
+//                )
+//                currentInputConnection?.sendKeyEvent(
+//                    KeyEvent(
+//                        now,
+//                        now,
+//                        KeyEvent.ACTION_UP,
+//                        KeyEvent.KEYCODE_CTRL_LEFT,
+//                        0,
+//                        0
+//                    )
+//                )
+//            }
+//
+//            isCtrlPressed && key == "a" -> {
+//                val now = System.currentTimeMillis()
+//                currentInputConnection?.sendKeyEvent(
+//                    KeyEvent(
+//                        now,
+//                        now,
+//                        KeyEvent.ACTION_DOWN,
+//                        KeyEvent.KEYCODE_CTRL_LEFT,
+//                        0,
+//                        0
+//                    )
+//                )
+//                currentInputConnection?.sendKeyEvent(
+//                    KeyEvent(
+//                        now,
+//                        now,
+//                        KeyEvent.ACTION_DOWN,
+//                        KeyEvent.KEYCODE_A,
+//                        0,
+//                        KeyEvent.META_CTRL_ON
+//                    )
+//                )
+//                currentInputConnection?.sendKeyEvent(
+//                    KeyEvent(
+//                        now,
+//                        now,
+//                        KeyEvent.ACTION_UP,
+//                        KeyEvent.KEYCODE_A,
+//                        0,
+//                        KeyEvent.META_CTRL_ON
+//                    )
+//                )
+//                currentInputConnection?.sendKeyEvent(
+//                    KeyEvent(
+//                        now,
+//                        now,
+//                        KeyEvent.ACTION_UP,
+//                        KeyEvent.KEYCODE_CTRL_LEFT,
+//                        0,
+//                        0
+//                    )
+//                )
+//            }
+//
+//            isAltPressed && key == "t" -> rulangSendTextYo()
+//            isCtrlPressed && key == "t" -> {
+//                val now = System.currentTimeMillis()
+//                currentInputConnection?.sendKeyEvent(
+//                    KeyEvent(
+//                        now,
+//                        now,
+//                        KeyEvent.ACTION_DOWN,
+//                        KeyEvent.KEYCODE_TAB,
+//                        0,
+//                        0
+//                    )
+//                )
+//                currentInputConnection?.sendKeyEvent(
+//                    KeyEvent(
+//                        now,
+//                        now,
+//                        KeyEvent.ACTION_UP,
+//                        KeyEvent.KEYCODE_TAB,
+//                        0,
+//                        0
+//                    )
+//                )
+//            }
 
-        if (moveForward) {
-            val textAfter = ic.getTextAfterCursor(10000, 0)?.toString() ?: ""
-            if (textAfter.isEmpty()) return@safeInputConnection
-            newPosition = maxOf(0, currentPosition + 1)
-        } else {
-            if (currentPosition == 0) return@safeInputConnection
-            newPosition = maxOf(0, currentPosition - 1)
-        }
-
-        ic.setSelection(newPosition, newPosition)
-    }
-}
-
-private fun safeInputConnection(action: (InputConnection) -> Unit) {
-    currentInputConnection?.let(action) ?: run {
-        Log.w(TAG, "InputConnection in null")
-    }
-}
-
-private fun copyText() {
-    safeInputConnection { ic ->
-        currentInputConnection?.performContextMenuAction(android.R.id.copy)
-    }
-}
-
-private fun rulangSendTextYo() {
-    if (isShiftPressed) sendText("Ё") else sendText("ё")
-}
-
-private fun pasteText() {
-    safeInputConnection { ic ->
-        ic.performContextMenuAction(android.R.id.paste)
-    }
-}
-
-private fun cutText() {
-    safeInputConnection { ic ->
-        ic.performContextMenuAction(android.R.id.cut)
-    }
-}
-
-private fun selectAllText() {
-    safeInputConnection { ic ->
-        ic.performContextMenuAction(android.R.id.selectAll)
-    }
-}
-
-private fun handleBackspace() {
-    val ic = currentInputConnection ?: return
-
-    if (hasSelectedText()) {
-        ic.commitText("", 1)
-    } else {
-        if (isCtrlPressed) {
-            deleteWordBeforeCursor()
-            if (!isBackspaceLongPress) {
-                resetModifiers()
+            isCtrlPressed && key == "-" -> {
+                moveCursorText(false)
+                movingCursor = true
             }
-        } else {
-//            old version
-//            ic.deleteSurroundingText(1, 0)
-            ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL))
-            ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DEL))
-        }
-    }
-}
 
-private fun handleEnter() {
-    safeInputConnection { ic ->
-        ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER))
-        ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER))
-    }
-}
-
-private fun sendText(text: String) {
-    try {
-        currentInputConnection?.commitText(text, 1)
-    } catch (e: Exception) {
-        Log.e(TAG, "Error sending text", e)
-    }
-}
-
-override fun onStartInput(info: EditorInfo?, restarting: Boolean) {
-    super.onStartInput(info, restarting)
-    Log.d(TAG, "onStartInput called")
-}
-
-override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
-    super.onStartInputView(info, restarting)
-    if (!isNumpadForced) {
-        val shouldShowNumpad = shouldShowNumpadKeyboard(info)
-
-        if (shouldShowNumpad && currentKeyboardType != KeyboardType.NUMPAD) {
-            currentKeyboardType = KeyboardType.NUMPAD
-            updateInputView()
-        } else if (!shouldShowNumpad && currentKeyboardType != KeyboardType.MAIN) {
-            currentKeyboardType = KeyboardType.MAIN
-            updateInputView()
-        }
-    }
-
-    speedDelete = getSpeedDelete().toLong()
-}
-
-private fun shouldShowNumpadKeyboard(info: EditorInfo?): Boolean {
-    if (info == null) return false
-
-    val inputType = info.inputType
-    return when (inputType and EditorInfo.TYPE_MASK_CLASS) {
-        EditorInfo.TYPE_CLASS_NUMBER,
-        EditorInfo.TYPE_CLASS_PHONE,
-        EditorInfo.TYPE_CLASS_DATETIME -> true
-
-        EditorInfo.TYPE_CLASS_TEXT -> {
-            val variation = inputType and EditorInfo.TYPE_MASK_VARIATION
-            variation == EditorInfo.TYPE_TEXT_VARIATION_EMAIL_ADDRESS ||
-                    variation == EditorInfo.TYPE_TEXT_VARIATION_PASSWORD ||
-                    variation == EditorInfo.TYPE_TEXT_VARIATION_URI ||
-                    variation == EditorInfo.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
-        }
-
-        else -> false
-    }
-}
-
-override fun onEvaluateInputViewShown(): Boolean {
-    super.onEvaluateInputViewShown()
-    Log.d(TAG, "onEvaluateInputViewShown called")
-    return true
-}
-
-override fun onShowInputRequested(flags: Int, configChange: Boolean): Boolean {
-    Log.d(TAG, "onShowInputRequested called")
-    return true
-}
-
-private fun handleDelete() {
-    val ic = currentInputConnection ?: return
-
-    if (hasSelectedText()) {
-        ic.commitText("", 1)
-    } else {
-        if (isCtrlPressed) {
-            deleteWordAfterCursor()
-            if (!isDelLongPress) {
-                resetModifiers()
+            isCtrlPressed && key == "=" -> {
+                moveCursorText(true)
+                movingCursor = true
             }
+
+            isAltPressed && key == "=" -> {
+                toggleKeyboard()
+                movingCursor = true
+                Log.d(TAG, "сработало альт энтер")
+            }
+
+            isAltPressed && key == "t" -> {
+                rulangSendTextYo()
+            }
+
+            isAltPressed && key == "-" -> {
+                sendText("~")
+            }
+
+            isAltPressed && key == "'" -> {
+                sendText("`")
+            }
+
+            (isCtrlPressed || isAltPressed) && key.matches(Regex("[a-zA-Z0-9]")) -> {
+                sendKeyWithModifiers(key)
+                movingCursor = true
+
+                if (isShiftPressed && !isCapsLock) {
+                    isShiftPressed = false
+                    updateKeyboardState()
+                }
+            }
+            else -> {
+                val charToSend = getKeyInputText(key)
+                sendText(charToSend)
+            }
+        }
+
+        //сброс ctrl и alt после комбинации
+        if ((isCtrlPressed || isAltPressed) && !movingCursor) {
+            resetModifiers()
+            movingCursor = false
+        }
+
+        // Снимаем Shift после одного символа, если не включен CapsLock
+        if (isShiftPressed && !isCapsLock) {
+            isShiftPressed = false
+            updateKeyboardState()
+        }
+    }
+
+    private fun sendKeyWithModifiers(key: String) {
+        val ic = currentInputConnection ?: return
+        val char = key[0]
+        val keyCode = when (char) {
+            in 'a'..'z' -> KeyEvent.KEYCODE_A + (char - 'a')
+            in 'A'..'Z' -> KeyEvent.KEYCODE_A + (char.lowercaseChar() - 'a')
+            in '0'..'9' -> KeyEvent.KEYCODE_0 + (char - '0')
+            else -> return
+        }
+        val metaState = when {
+            isCtrlPressed && isAltPressed -> KeyEvent.META_CTRL_ON or KeyEvent.META_ALT_ON
+            isCtrlPressed -> KeyEvent.META_CTRL_ON
+            isAltPressed -> KeyEvent.META_ALT_ON
+            else -> 0
+        }
+
+        val now = System.currentTimeMillis()
+        ic.sendKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_DOWN, keyCode, 0, metaState))
+        ic.sendKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_UP, keyCode, 0, metaState))
+    }
+
+    private fun moveCursorText(moveForward: Boolean) {
+        safeInputConnection { ic ->
+            val textBefore = ic.getTextBeforeCursor(10000, 0)?.toString() ?: ""
+            val currentPosition = textBefore.length
+            val newPosition: Int
+
+            if (moveForward) {
+                val textAfter = ic.getTextAfterCursor(10000, 0)?.toString() ?: ""
+                if (textAfter.isEmpty()) return@safeInputConnection
+                newPosition = maxOf(0, currentPosition + 1)
+            } else {
+                if (currentPosition == 0) return@safeInputConnection
+                newPosition = maxOf(0, currentPosition - 1)
+            }
+
+            ic.setSelection(newPosition, newPosition)
+        }
+    }
+
+    private fun safeInputConnection(action: (InputConnection) -> Unit) {
+        currentInputConnection?.let(action) ?: run {
+            Log.w(TAG, "InputConnection in null")
+        }
+    }
+
+    private fun rulangSendTextYo() {
+        if (isShiftPressed) sendText("Ё") else sendText("ё")
+    }
+
+    private fun handleBackspace() {
+        val ic = currentInputConnection ?: return
+
+        if (hasSelectedText()) {
+            ic.commitText("", 1)
         } else {
-//            old version
-//            ic.deleteSurroundingText(0, 1)
-            ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_FORWARD_DEL))
-            ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_FORWARD_DEL))
+            if (isCtrlPressed) {
+                deleteWordBeforeCursor()
+                if (!isBackspaceLongPress) {
+                    resetModifiers()
+                }
+            } else {
+                ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL))
+                ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DEL))
+            }
         }
     }
-}
 
-private fun hasSelectedText(): Boolean {
-    val ic = currentInputConnection ?: return false
-    val selectedText = ic.getSelectedText(0)
-    return selectedText != null && selectedText.isNotEmpty()
-}
-
-// Удаление слова перед курсором (Ctrl+Backspace)
-private fun deleteWordBeforeCursor() {
-    val ic = currentInputConnection ?: return
-    val textBeforeCursor = ic.getTextBeforeCursor(10000, 0)?.toString() ?: return
-    val punctuation = "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~"
-
-    if (textBeforeCursor.isEmpty()) return
-
-    //find position for start deleting
-    var startIndex = textBeforeCursor.length - 1
-    var foundNonSpace = false
-
-    //go at cursor to back
-    while (startIndex >= 0) {
-        if (!textBeforeCursor[startIndex].isWhitespace() && textBeforeCursor[startIndex] !in punctuation) {
-            foundNonSpace = true
-        } else if (foundNonSpace) {
-            startIndex++
-            break
+    private fun handleEnter() {
+        if (isAltPressed) {
+            return
         }
-        startIndex--
-    }
 
-    //if go to start string
-    if (startIndex < 0) startIndex = 0
-
-    val charsToDelete = textBeforeCursor.length - startIndex
-    if (charsToDelete > 0) {
-        ic.deleteSurroundingText(charsToDelete, 0)
-    }
-}
-
-// Удаление слова после курсора (Ctrl+Delete)
-private fun deleteWordAfterCursor() {
-    val ic = currentInputConnection ?: return
-    val textAfterCursor = ic.getTextAfterCursor(10000, 0)?.toString() ?: return
-    val punctuation = "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~"
-
-    if (textAfterCursor.isEmpty()) return
-
-    //finding position to end deleting
-    var endIndex = 0
-    var foundNonSpace = false
-
-    //go at cursor to forward
-    while (endIndex < textAfterCursor.length) {
-        if (!textAfterCursor[endIndex].isWhitespace() && textAfterCursor[endIndex] !in punctuation) {
-            foundNonSpace = true
-        } else if (foundNonSpace) {
-            break
+        safeInputConnection { ic ->
+            ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER))
+            ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER))
         }
-        endIndex++
     }
 
-    if (endIndex > 0) {
-        ic.deleteSurroundingText(0, endIndex)
+    private fun sendText(text: String) {
+        try {
+            currentInputConnection?.commitText(text, 1)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error sending text", e)
+        }
     }
-}
-}
+
+    override fun onStartInput(info: EditorInfo?, restarting: Boolean) {
+        super.onStartInput(info, restarting)
+        Log.d(TAG, "onStartInput called")
+    }
+
+    override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
+        super.onStartInputView(info, restarting)
+        if (!isNumpadForced) {
+            val shouldShowNumpad = shouldShowNumpadKeyboard(info)
+
+            if (shouldShowNumpad && currentKeyboardType != KeyboardType.NUMPAD) {
+                currentKeyboardType = KeyboardType.NUMPAD
+                updateInputView()
+            } else if (!shouldShowNumpad && currentKeyboardType != KeyboardType.MAIN) {
+                currentKeyboardType = KeyboardType.MAIN
+                updateInputView()
+            }
+        }
+
+        speedDelete = getSpeedDelete().toLong()
+    }
+
+    private fun shouldShowNumpadKeyboard(info: EditorInfo?): Boolean {
+        if (info == null) return false
+
+        val inputType = info.inputType
+        return when (inputType and EditorInfo.TYPE_MASK_CLASS) {
+            EditorInfo.TYPE_CLASS_NUMBER,
+            EditorInfo.TYPE_CLASS_PHONE,
+            EditorInfo.TYPE_CLASS_DATETIME -> true
+
+            EditorInfo.TYPE_CLASS_TEXT -> {
+                val variation = inputType and EditorInfo.TYPE_MASK_VARIATION
+                variation == EditorInfo.TYPE_TEXT_VARIATION_EMAIL_ADDRESS ||
+                        variation == EditorInfo.TYPE_TEXT_VARIATION_PASSWORD ||
+                        variation == EditorInfo.TYPE_TEXT_VARIATION_URI ||
+                        variation == EditorInfo.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
+            }
+
+            else -> false
+        }
+    }
+
+    override fun onEvaluateInputViewShown(): Boolean {
+        super.onEvaluateInputViewShown()
+        Log.d(TAG, "onEvaluateInputViewShown called")
+        return true
+    }
+
+    override fun onShowInputRequested(flags: Int, configChange: Boolean): Boolean {
+        Log.d(TAG, "onShowInputRequested called")
+        return true
+    }
+
+    private fun handleDelete() {
+        val ic = currentInputConnection ?: return
+
+        if (hasSelectedText()) {
+            ic.commitText("", 1)
+        } else {
+            if (isCtrlPressed) {
+                deleteWordAfterCursor()
+                if (!isDelLongPress) {
+                    resetModifiers()
+                }
+            } else if (isAltPressed) {
+                sendEsc()
+                resetModifiers()
+            } else {
+                ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_FORWARD_DEL))
+                ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_FORWARD_DEL))
+            }
+        }
+    }
+
+    private fun sendEsc() {
+        safeInputConnection { ic ->
+            val now = System.currentTimeMillis()
+            ic.sendKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ESCAPE, 0, 0))
+            ic.sendKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ESCAPE, 0, 0))
+        }
+    }
+
+        private fun hasSelectedText(): Boolean {
+            val ic = currentInputConnection ?: return false
+            val selectedText = ic.getSelectedText(0)
+            return selectedText != null && selectedText.isNotEmpty()
+        }
+
+        // Удаление слова перед курсором (Ctrl+Backspace)
+        private fun deleteWordBeforeCursor() {
+            val ic = currentInputConnection ?: return
+            val textBeforeCursor = ic.getTextBeforeCursor(10000, 0)?.toString() ?: return
+            val punctuation = "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~"
+
+            if (textBeforeCursor.isEmpty()) return
+
+            //find position for start deleting
+            var startIndex = textBeforeCursor.length - 1
+            var foundNonSpace = false
+
+            //go at cursor to back
+            while (startIndex >= 0) {
+                if (!textBeforeCursor[startIndex].isWhitespace() && textBeforeCursor[startIndex] !in punctuation) {
+                    foundNonSpace = true
+                } else if (foundNonSpace) {
+                    startIndex++
+                    break
+                }
+                startIndex--
+            }
+
+            //if go to start string
+            if (startIndex < 0) startIndex = 0
+
+            val charsToDelete = textBeforeCursor.length - startIndex
+            if (charsToDelete > 0) {
+                ic.deleteSurroundingText(charsToDelete, 0)
+            }
+        }
+
+        // Удаление слова после курсора (Ctrl+Delete)
+        private fun deleteWordAfterCursor() {
+            val ic = currentInputConnection ?: return
+            val textAfterCursor = ic.getTextAfterCursor(10000, 0)?.toString() ?: return
+            val punctuation = "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~"
+
+            if (textAfterCursor.isEmpty()) return
+
+            //finding position to end deleting
+            var endIndex = 0
+            var foundNonSpace = false
+
+            //go at cursor to forward
+            while (endIndex < textAfterCursor.length) {
+                if (!textAfterCursor[endIndex].isWhitespace() && textAfterCursor[endIndex] !in punctuation) {
+                    foundNonSpace = true
+                } else if (foundNonSpace) {
+                    break
+                }
+                endIndex++
+            }
+
+            if (endIndex > 0) {
+                ic.deleteSurroundingText(0, endIndex)
+            }
+        }
+    }

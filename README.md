@@ -11,18 +11,13 @@ ru:
 
 
 комбинации:
-  ctrl + c = скопировать текст
-  
-  ctrl + v = ctrl + м = вставить текст
-  
-  ctrl + x = ctrl + ч = вырезать текст
-  
-  ctrl + a = ctrl + ф = выделить весь текст
+   
+  alt + space = смена раскладки
 
-  ctrl + bs = удалить слово сзади курсора
+  alt + del = esc
+ 
+  ctrl + delete/backspace = удалить слово целиком вперёд курсора / назад
 
-  ctrl + del = удалить слово спереди курсора
-  
   alt + t = alt + е = написать "ё"
 
   ctrl + t = табуляция
@@ -32,8 +27,14 @@ ru:
   ctrl + = = сдвиг курсора вперёд
 
   alt + = = открытие NumPad'a
- 
- клавиатуру можно доделать по своему желанию
+
+  alt + - = ~
+  
+  alt + ' = `
+
+  ctrl/alt + любая клавиша = комбинация клавиш на усмотрение системы
+
+клавиатуру можно доделать по своему желанию
  
 **путь к .apk файлу:**
   [https://github.com/dantez004/thedantezkeyboard/blob/main/apk/thedantezkeyboard.apk](https://github.com/dantez004/thedantezkeyboard/tree/main/apk)
@@ -45,14 +46,6 @@ en:
   *images from "ru"*
 
  combinations:
-  ctrl + c = copy text
-  
-  ctrl + v = paste text
-  
-  ctrl + x = cut text
-  
-  ctrl + a = select all text
-
   ctrl + bs = delete word back cursor
 
   ctrl + del = delete word forward cursor
@@ -66,6 +59,14 @@ en:
   ctrl + - = move cursor forward
 
   alt + = = open NumPad 
+
+  alt + - = ~
+  
+  alt + ' = `
+
+  alt + space = toggle language
+
+  alt + del = esc
 
  u can resume dev at will
   
